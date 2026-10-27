@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 연결 (MCP)</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --panel: #ffffff;
+    --text: #1f1f1d;
+    --muted: #6b6a66;
+    --line: #d9d7d0;
+    --code-bg: #f0efea;
+    --accent: #2f5fd0;
+    --ok: #2f9a6b;
+    --warn: #b8860b;
+    --danger: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ecebe7;
+      --muted: #a3a19a;
+      --line: #3a3935;
+      --code-bg: #2a2926;
+      --accent: #7ea2ff;
+      --ok: #5cc99a;
+      --warn: #e0b44a;
+      --danger: #ff7b6b;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614;
+    --panel: #201f1d;
+    --text: #ecebe7;
+    --muted: #a3a19a;
+    --line: #3a3935;
+    --code-bg: #2a2926;
+    --accent: #7ea2ff;
+    --ok: #5cc99a;
+    --warn: #e0b44a;
+    --danger: #ff7b6b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  }
+  header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  header a { color: var(--accent); text-decoration: none; font-size: 14px; }
+  header .spacer { flex: 1; }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h2 { font-size: 18px; margin: 36px 0 8px; }
+  h3 { font-size: 15px; margin: 22px 0 6px; }
+  p { margin: 6px 0 10px; }
+  .lead { font-size: 16px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .codebox { position: relative; margin: 8px 0 12px; }
+  pre {
+    margin: 0; padding: 12px 14px; padding-right: 64px; background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 8px; overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; line-height: 1.5;
+  }
+  button {
+    font: inherit; font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  .codebox button { position: absolute; top: 8px; right: 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .url { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .url code { font-size: 15px; padding: 6px 10px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  .status.ok .dot { background: var(--ok); }
+  .status.err .dot { background: var(--danger); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  td code { white-space: nowrap; }
+  .badge { display: inline-block; font-size: 12px; padding: 0 7px; border-radius: 10px; border: 1px solid currentColor; white-space: nowrap; }
+  .badge.read { color: var(--ok); }
+  .badge.write { color: var(--warn); }
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0 4px; }
+  .tabs button[aria-selected="true"] { border-color: var(--accent); color: var(--accent); }
+  .tabpanel[hidden] { display: none; }
+  ol, ul { padding-left: 22px; margin: 6px 0 10px; }
+  li { margin: 3px 0; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 12px; background: var(--panel); border-radius: 0 6px 6px 0; font-size: 14px; }
+  .table-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI 연결 (MCP)</h1>
+  <a href="/">← 그래프로 돌아가기</a>
+  <span class="spacer"></span>
+  <button id="theme" type="button">테마</button>
+</header>
+<main>
+  <p class="lead">Claude, Cursor 같은 AI 도구가 이 그래프를 읽고 고칠 수 있도록 MCP(Model Context Protocol) 서버를 열어 두었습니다. 아래 주소를 AI 도구의 MCP 설정에 넣으면 됩니다.</p>
+
+  <div class="card">
+    <div class="url"><code id="mcpUrl">https://titan-graph.robocast.workers.dev/mcp</code><button type="button" data-copy="mcpUrl">복사</button></div>
+    <p class="muted" style="margin-top:10px">방식: Streamable HTTP · 서버 상태: <span class="status" id="status"><span class="dot"></span><span id="statusText">확인 중</span></span></p>
+  </div>
+
+  <h2>권한</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>연결 방법</th><th>할 수 있는 일</th></tr></thead>
+    <tbody>
+      <tr><td>주소만 넣기 (토큰 없음)</td><td><span class="badge read">읽기</span> 그래프 개요, 검색, 노드 보기, 메모·휴지통·변경 기록 보기, JSON-LD 내보내기</td></tr>
+      <tr><td><code>Authorization: Bearer &lt;MCP_TOKEN&gt;</code> 헤더 추가</td><td><span class="badge write">쓰기</span> 위 기능 + 노드·관계·메모 추가, 수정, 삭제, 복원, 수정 되돌리기</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="muted">AI가 바꾼 내용은 변경 기록에 <code>AI (MCP)</code>로 남고, 삭제한 것은 휴지통에서 되살릴 수 있습니다. 쓰기 토큰은 웹 편집 비밀번호와 따로 관리합니다.</p>
+
+  <h3>쓰기 토큰 만들기 (관리자, 한 번만)</h3>
+  <ol>
+    <li>아래 버튼으로 긴 무작위 토큰을 만들어 복사합니다. 토큰은 이 브라우저 안에서만 만들어지고 어디에도 전송되지 않습니다.</li>
+    <li>Cloudflare 대시보드 → Workers &amp; Pages → <b>titan-graph</b> → <b>Settings</b> → <b>Variables and Secrets</b> → <b>Add</b>에서 Type을 <b>Secret</b>, 이름을 <code>MCP_TOKEN</code>으로 넣고 <b>Deploy</b>합니다.</li>
+    <li>AI 도구 설정의 <code>&lt;MCP_TOKEN&gt;</code> 자리에 같은 값을 넣습니다.</li>
+  </ol>
+  <div class="codebox"><pre id="tokenOut">버튼을 누르면 토큰이 여기에 나옵니다</pre><button type="button" id="makeToken">토큰 만들기</button></div>
+
+  <h2>도구별 연결 방법</h2>
+  <p class="muted">읽기만 할 때는 헤더 부분을 빼면 됩니다.</p>
+  <div class="tabs" role="tablist" id="tabs">
+    <button type="button" role="tab" data-tab="claude-code" aria-selected="true">Claude Code</button>
+    <button type="button" role="tab" data-tab="claude-app" aria-selected="false">Claude 앱 (커넥터)</button>
+    <button type="button" role="tab" data-tab="cursor" aria-selected="false">Cursor</button>
+    <button type="button" role="tab" data-tab="vscode" aria-selected="false">VS Code</button>
+    <button type="button" role="tab" data-tab="other" aria-selected="false">그 밖의 도구</button>
+  </div>
+
+  <section class="tabpanel" data-panel="claude-code">
+    <h3>Claude Code (터미널)</h3>
+    <p>터미널에서 한 줄로 추가합니다.</p>
+    <div class="codebox"><pre id="cc">claude mcp add --transport http titan-graph {URL} --header "Authorization: Bearer &lt;MCP_TOKEN&gt;"</pre><button type="button" data-copy="cc">복사</button></div>
+    <p>추가한 뒤 Claude Code 안에서 <code>/mcp</code>를 입력하면 연결 상태와 도구 목록을 볼 수 있습니다.</p>
+  </section>
+
+  <section class="tabpanel" data-panel="claude-app" hidden>
+    <h3>Claude 웹·데스크톱 앱 (사용자 지정 커넥터)</h3>
+    <ol>
+      <li>Claude 앱의 <b>설정</b> → <b>커넥터</b>에서 <b>사용자 지정 커넥터 추가</b>를 고릅니다.</li>
+      <li>이름은 <code>titan-graph</code>, 주소는 위의 MCP 주소를 넣습니다.</li>
+      <li>대화창의 도구 메뉴에서 titan-graph를 켜고 사용합니다.</li>
+    </ol>
+    <p class="note">커넥터 화면에는 헤더를 넣는 칸이 없어 기본은 <b>읽기 전용</b>입니다. 쓰기가 꼭 필요하면 주소 끝에 <code>?token=&lt;MCP_TOKEN&gt;</code>을 붙여 넣을 수 있습니다. 이때는 그 주소를 아는 사람 누구나 그래프를 고칠 수 있으니 공유하지 마세요.</p>
+  </section>
+
+  <section class="tabpanel" data-panel="cursor" hidden>
+    <h3>Cursor</h3>
+    <p><code>~/.cursor/mcp.json</code>(모든 프로젝트) 또는 프로젝트의 <code>.cursor/mcp.json</code>에 넣습니다.</p>
+    <div class="codebox"><pre id="cursorJson">{
+  "mcpServers": {
+    "titan-graph": {
+      "url": "{URL}",
+      "headers": { "Authorization": "Bearer &lt;MCP_TOKEN&gt;" }
+    }
+  }
+}</pre><button type="button" data-copy="cursorJson">복사</button></div>
+  </section>
+
+  <section class="tabpanel" data-panel="vscode" hidden>
+    <h3>VS Code (GitHub Copilot 에이전트 모드)</h3>
+    <p>프로젝트의 <code>.vscode/mcp.json</code>에 넣습니다.</p>
+    <div class="codebox"><pre id="vscodeJson">{
+  "servers": {
+    "titan-graph": {
+      "type": "http",
+      "url": "{URL}",
+      "headers": { "Authorization": "Bearer &lt;MCP_TOKEN&gt;" }
+    }
+  }
+}</pre><button type="button" data-copy="vscodeJson">복사</button></div>
+  </section>
+
+  <section class="tabpanel" data-panel="other" hidden>
+    <h3>원격 HTTP MCP를 지원하는 도구</h3>
+    <p>MCP 서버 주소(URL)와, 쓰기가 필요하면 <code>Authorization</code> 헤더를 넣는 칸을 찾아 위 값을 입력합니다.</p>
+    <h3>로컬(stdio) MCP만 지원하는 도구</h3>
+    <p><code>mcp-remote</code>로 원격 서버를 로컬 서버처럼 이어 줍니다 (Node.js 필요). 예: Claude 데스크톱의 <code>claude_desktop_config.json</code></p>
+    <div class="codebox"><pre id="remoteJson">{
+  "mcpServers": {
+    "titan-graph": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "{URL}", "--header", "Authorization: Bearer &lt;MCP_TOKEN&gt;"]
+    }
+  }
+}</pre><button type="button" data-copy="remoteJson">복사</button></div>
+    <h3>직접 시험해 보기 (curl)</h3>
+    <div class="codebox"><pre id="curl">curl -s {URL} \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre><button type="button" data-copy="curl">복사</button></div>
+  </section>
+
+  <h2>이렇게 물어보세요</h2>
+  <ul>
+    <li>"titan-graph에서 거인이 나오는 작품들을 찾아서 주제를 비교해 줘"</li>
+    <li>"브롭딩낵 사람과 진격의 거인의 거인을 크기와 성격으로 비교해 줘"</li>
+    <li>"엘런 예거 노드에 '시즌 4에서 주제가 뒤집힌다'는 분홍색 메모를 붙여 줘" (쓰기)</li>
+    <li>"라이너 브라운 노드를 만들고 진격의 거인 등장인물로 이어 줘" (쓰기)</li>
+    <li>"오늘 바뀐 내용을 변경 기록에서 요약해 줘"</li>
+  </ul>
+
+  <h2>제공하는 도구 <span class="muted" id="toolCount"></span></h2>
+  <p class="muted">이 목록은 서버에서 실시간으로 불러옵니다.</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>도구</th><th>권한</th><th>설명</th></tr></thead>
+    <tbody id="tools"><tr><td colspan="3" class="muted">불러오는 중…</td></tr></tbody>
+  </table>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  const url = location.origin + "/mcp";
+  document.getElementById("mcpUrl").textContent = url;
+  document.querySelectorAll("pre").forEach((pre) => { pre.textContent = pre.textContent.split("{URL}").join(url); });
+
+  async function copy(text, button) {
+    try {
+      await navigator.clipboard.writeText(text);
+      const label = button.textContent;
+      button.textContent = "복사됨";
+      setTimeout(() => (button.textContent = label), 1500);
+    } catch {
+      prompt("아래 내용을 복사하세요", text);
+    }
+  }
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => copy(document.getElementById(b.dataset.copy).textContent, b)));
+
+  document.getElementById("makeToken").addEventListener("click", (ev) => {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    const token = "tg_" + Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    document.getElementById("tokenOut").textContent = token;
+    copy(token, ev.currentTarget);
+  });
+
+  const tabs = document.querySelectorAll("#tabs [role=tab]");
+  tabs.forEach((t) => t.addEventListener("click", () => {
+    tabs.forEach((x) => x.setAttribute("aria-selected", String(x === t)));
+    document.querySelectorAll(".tabpanel").forEach((p) => (p.hidden = p.dataset.panel !== t.dataset.tab));
+  }));
+
+  document.getElementById("theme").addEventListener("click", () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+  });
+
+  async function rpc(method, params, id) {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
+    });
+    const body = await res.json();
+    if (body.error) throw new Error(body.error.message);
+    return body.result;
+  }
+
+  (async () => {
+    const status = document.getElementById("status");
+    const tbody = document.getElementById("tools");
+    try {
+      const init = await rpc("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "connect-page", version: "1" } }, 1);
+      const { tools } = await rpc("tools/list", {}, 2);
+      status.classList.add("ok");
+      document.getElementById("statusText").textContent = `정상 (${init.serverInfo.title || init.serverInfo.name} ${init.serverInfo.version}, 프로토콜 ${init.protocolVersion})`;
+      document.getElementById("toolCount").textContent = `(${tools.length}개)`;
+      tbody.replaceChildren(...tools.map((t) => {
+        const tr = document.createElement("tr");
+        const name = document.createElement("td");
+        name.innerHTML = "<code></code><br><span class='muted'></span>";
+        name.querySelector("code").textContent = t.name;
+        name.querySelector("span").textContent = t.title || "";
+        const perm = document.createElement("td");
+        const ro = t.annotations && t.annotations.readOnlyHint;
+        perm.innerHTML = ro ? "<span class='badge read'>읽기</span>" : "<span class='badge write'>쓰기</span>";
+        const desc = document.createElement("td");
+        desc.textContent = t.description;
+        tr.append(name, perm, desc);
+        return tr;
+      }));
+    } catch (err) {
+      status.classList.add("err");
+      document.getElementById("statusText").textContent = "연결할 수 없습니다: " + err.message;
+      tbody.innerHTML = "<tr><td colspan='3' class='muted'>서버에서 도구 목록을 불러오지 못했습니다.</td></tr>";
+    }
+  })();
+})();
+</script>
+</body>
+</html>

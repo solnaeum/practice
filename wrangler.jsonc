@@ -4,11 +4,11 @@
   "name": "titan-graph",
   "main": "src/index.js",
   "compatibility_date": "2026-10-13",
-  // /api/* 는 Worker가 처리하고, 나머지는 public/ 의 정적 파일을 그대로 내보낸다.
+  // /api/* 와 /mcp 는 Worker가 처리하고, 나머지는 public/ 의 정적 파일을 그대로 내보낸다.
   "assets": {
     "directory": "./public/",
     "binding": "ASSETS",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/mcp", "/mcp/*"]
   },
   "d1_databases": [
     {
@@ -18,6 +18,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  // 편집 비밀번호 EDIT_PASSWORD 는 대시보드에서 Secret으로 넣는다. 배포할 때 대시보드 값을 유지한다.
+  // 편집 비밀번호 EDIT_PASSWORD 와 AI 쓰기 토큰 MCP_TOKEN 은 대시보드에서 Secret으로 넣는다. 배포할 때 대시보드 값을 유지한다.
   "keep_vars": true
 }
