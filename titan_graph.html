@@ -1,0 +1,1950 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>거인 이야기 그래프</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --panel: #ffffff;
+    --text: #1f1f1d;
+    --muted: #6b6a66;
+    --line: #d9d7d0;
+    --edge: #b9b6ad;
+    --edge-hi: #3d3b36;
+    --accent: #2f5fd0;
+    --g-work: #2f5fd0;
+    --g-character: #d0572f;
+    --g-person: #8a5cc8;
+    --g-org: #2f9a6b;
+    --g-place: #b8860b;
+    --g-species: #c23b6b;
+    --g-theme: #1f8fa6;
+    --g-class: #7a7870;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ecebe7;
+      --muted: #a3a19a;
+      --line: #3a3935;
+      --edge: #55534d;
+      --edge-hi: #e8e6df;
+      --accent: #7ea2ff;
+      --g-work: #7ea2ff;
+      --g-character: #ff8a5c;
+      --g-person: #b896f0;
+      --g-org: #5cc99a;
+      --g-place: #e0b44a;
+      --g-species: #f07aa3;
+      --g-theme: #5cc6db;
+      --g-class: #a3a19a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614;
+    --panel: #201f1d;
+    --text: #ecebe7;
+    --muted: #a3a19a;
+    --line: #3a3935;
+    --edge: #55534d;
+    --edge-hi: #e8e6df;
+    --accent: #7ea2ff;
+    --g-work: #7ea2ff;
+    --g-character: #ff8a5c;
+    --g-person: #b896f0;
+    --g-org: #5cc99a;
+    --g-place: #e0b44a;
+    --g-species: #f07aa3;
+    --g-theme: #5cc6db;
+    --g-class: #a3a19a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+  }
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  header .stats { color: var(--muted); font-size: 13px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
+  input[type="search"] {
+    font: inherit;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    width: 180px;
+  }
+  button, label.toggle {
+    font: inherit;
+    font-size: 13px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #stage { position: relative; overflow: hidden; min-height: 0; }
+  svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
+  svg.panning { cursor: grabbing; }
+  .edge { stroke: var(--edge); stroke-width: 1.2; fill: none; }
+  .edge.hi { stroke: var(--edge-hi); stroke-width: 2; }
+  .edge.dim, .node.dim, .elabel.dim { opacity: 0.12; }
+  .elabel { font-size: 10px; fill: var(--muted); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; pointer-events: none; }
+  .elabel.hi { fill: var(--text); font-weight: 600; }
+  .node { cursor: pointer; }
+  .node circle { stroke: var(--bg); stroke-width: 2; }
+  .node.selected circle { stroke: var(--text); stroke-width: 3; }
+  .node:focus { outline: none; }
+  .node:focus-visible circle { stroke: var(--accent); stroke-width: 3; }
+  .node text { font-size: 12px; fill: var(--text); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+  .node.class-node circle { stroke-dasharray: 3 2; stroke: var(--g-class); fill: var(--bg) !important; stroke-width: 2; }
+  aside {
+    border-left: 1px solid var(--line);
+    background: var(--panel);
+    overflow-y: auto;
+    padding: 14px 16px;
+    min-height: 0;
+  }
+  aside h2 { font-size: 15px; margin: 0 0 4px; }
+  aside h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
+  .legend { display: grid; gap: 4px; }
+  .legend label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
+  .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .swatch.dashed { background: transparent !important; border: 2px dashed var(--g-class); }
+  .count { color: var(--muted); margin-left: auto; font-variant-numeric: tabular-nums; }
+  .type-chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); margin: 2px 4px 2px 0; }
+  dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 4px 10px; font-size: 13px; }
+  dt { color: var(--muted); }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .rel { display: grid; gap: 2px; font-size: 13px; }
+  .rel a, .rel button.link {
+    color: var(--accent);
+    background: none; border: none; padding: 0; font: inherit; cursor: pointer; text-align: left;
+  }
+  .rel .p { color: var(--muted); }
+  .iri { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+  .hint { color: var(--muted); font-size: 13px; }
+  @media (max-width: 760px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; height: auto; }
+    aside { border-left: none; border-top: 1px solid var(--line); }
+    .controls { margin-left: 0; width: 100%; }
+    input[type="search"] { flex: 1; min-width: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>거인 이야기 그래프</h1>
+  <span class="stats" id="stats"></span>
+  <div class="controls">
+    <input type="search" id="search" placeholder="노드 검색" aria-label="노드 검색">
+    <label class="toggle"><input type="checkbox" id="showLabels"> 관계 이름</label>
+    <label class="toggle"><input type="checkbox" id="showOntology"> 온톨로지 클래스</label>
+    <button id="reset" type="button">다시 배치</button>
+    <button id="theme" type="button" aria-label="테마 바꾸기">테마</button>
+  </div>
+</header>
+<div id="stage">
+  <svg id="graph" role="img" aria-label="노드와 엣지 그래프">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--edge)"></path>
+      </marker>
+      <marker id="arrow-hi" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="var(--edge-hi)"></path>
+      </marker>
+    </defs>
+    <g id="viewport">
+      <g id="edges"></g>
+      <g id="elabels"></g>
+      <g id="nodes"></g>
+    </g>
+  </svg>
+</div>
+<aside>
+  <div id="detail">
+    <h2>노드를 선택하세요</h2>
+    <p class="hint">노드를 누르면 속성과 연결된 관계가 여기에 나옵니다. 끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다.</p>
+  </div>
+  <h3>노드 종류</h3>
+  <div class="legend" id="legend"></div>
+  <h3>출처</h3>
+  <p class="hint">데이터: <code>titan.jsonld</code> (schema.org 기반 JSON-LD). 이 페이지는 <code>tools/build_titan_graph.py</code>로 생성됩니다.</p>
+</aside>
+
+<script type="application/ld+json" id="titan-data">
+{
+  "@context": {
+    "@vocab": "https://schema.org/",
+    "schema": "https://schema.org/",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "giant": "https://github.com/solnaeum/practice/ontology#",
+    "@base": "https://github.com/solnaeum/practice/data/",
+    "@language": "ko"
+  },
+  "@graph": [
+    {
+      "@id": "https://github.com/solnaeum/practice/ontology",
+      "@type": "owl:Ontology",
+      "rdfs:label": "거인 이야기 온톨로지",
+      "rdfs:comment": "「진격의 거인」과 「걸리버 여행기」 정리 문서(attack_on_titan_imdb.md, gullivers_travels_giants.md)를 schema.org 어휘로 옮긴 그래프. schema.org에 없는 개념만 giant: 네임스페이스로 정의한다."
+    },
+    {
+      "@id": "giant:FictionalCharacter",
+      "@type": "rdfs:Class",
+      "rdfs:label": "등장인물",
+      "rdfs:subClassOf": {
+        "@id": "schema:Person"
+      },
+      "rdfs:comment": "작품 속 인물. schema:character의 값으로 쓰기 위해 schema:Person을 확장한다."
+    },
+    {
+      "@id": "giant:FictionalPlace",
+      "@type": "rdfs:Class",
+      "rdfs:label": "가상의 장소",
+      "rdfs:subClassOf": {
+        "@id": "schema:Place"
+      }
+    },
+    {
+      "@id": "giant:FictionalOrganization",
+      "@type": "rdfs:Class",
+      "rdfs:label": "가상의 조직",
+      "rdfs:subClassOf": {
+        "@id": "schema:Organization"
+      }
+    },
+    {
+      "@id": "giant:Species",
+      "@type": "rdfs:Class",
+      "rdfs:label": "종족",
+      "rdfs:subClassOf": {
+        "@id": "schema:Thing"
+      },
+      "rdfs:comment": "작품 속 종족. 거인인지, 사람과 비교한 크기를 함께 기록한다."
+    },
+    {
+      "@id": "giant:Theme",
+      "@type": "rdfs:Class",
+      "rdfs:label": "주제",
+      "rdfs:subClassOf": {
+        "@id": "schema:Thing"
+      }
+    },
+    {
+      "@id": "giant:hasTheme",
+      "@type": "rdf:Property",
+      "rdfs:label": "주제",
+      "rdfs:subPropertyOf": {
+        "@id": "schema:about"
+      },
+      "schema:domainIncludes": {
+        "@id": "schema:CreativeWork"
+      },
+      "schema:rangeIncludes": {
+        "@id": "giant:Theme"
+      }
+    },
+    {
+      "@id": "giant:species",
+      "@type": "rdf:Property",
+      "rdfs:label": "종족",
+      "schema:domainIncludes": {
+        "@id": "giant:FictionalCharacter"
+      },
+      "schema:rangeIncludes": {
+        "@id": "giant:Species"
+      }
+    },
+    {
+      "@id": "giant:inhabits",
+      "@type": "rdf:Property",
+      "rdfs:label": "사는 곳",
+      "schema:domainIncludes": {
+        "@id": "giant:Species"
+      },
+      "schema:rangeIncludes": {
+        "@id": "giant:FictionalPlace"
+      }
+    },
+    {
+      "@id": "giant:isGiant",
+      "@type": "rdf:Property",
+      "rdfs:label": "거인 여부",
+      "schema:domainIncludes": {
+        "@id": "giant:Species"
+      },
+      "schema:rangeIncludes": {
+        "@id": "schema:Boolean"
+      }
+    },
+    {
+      "@id": "giant:scaleRelativeToHuman",
+      "@type": "rdf:Property",
+      "rdfs:label": "사람 대비 크기",
+      "rdfs:comment": "보통 사람의 키를 1로 볼 때의 배율.",
+      "schema:domainIncludes": {
+        "@id": "giant:Species"
+      },
+      "schema:rangeIncludes": {
+        "@id": "schema:Number"
+      }
+    },
+    {
+      "@id": "giant:voicedBy",
+      "@type": "rdf:Property",
+      "rdfs:label": "성우",
+      "schema:domainIncludes": {
+        "@id": "giant:FictionalCharacter"
+      },
+      "schema:rangeIncludes": {
+        "@id": "schema:Person"
+      }
+    },
+    {
+      "@id": "giant:japaneseVoice",
+      "@type": "rdf:Property",
+      "rdfs:label": "일본어 성우",
+      "rdfs:subPropertyOf": {
+        "@id": "giant:voicedBy"
+      }
+    },
+    {
+      "@id": "giant:englishVoice",
+      "@type": "rdf:Property",
+      "rdfs:label": "영어 더빙 성우",
+      "rdfs:subPropertyOf": {
+        "@id": "giant:voicedBy"
+      }
+    },
+    {
+      "@id": "giant:memberOf",
+      "@type": "rdf:Property",
+      "rdfs:label": "소속",
+      "rdfs:subPropertyOf": {
+        "@id": "schema:memberOf"
+      },
+      "schema:domainIncludes": {
+        "@id": "giant:FictionalCharacter"
+      },
+      "schema:rangeIncludes": {
+        "@id": "giant:FictionalOrganization"
+      }
+    },
+    {
+      "@id": "giant:comparableTo",
+      "@type": [
+        "rdf:Property",
+        "owl:SymmetricProperty"
+      ],
+      "rdfs:label": "비교 대상",
+      "rdfs:comment": "두 작품을 나란히 비교할 수 있음을 나타낸다. 대칭 관계.",
+      "schema:domainIncludes": {
+        "@id": "schema:CreativeWork"
+      },
+      "schema:rangeIncludes": {
+        "@id": "schema:CreativeWork"
+      }
+    },
+    {
+      "@id": "work/attack-on-titan",
+      "@type": "TVSeries",
+      "name": [
+        "진격의 거인",
+        {
+          "@value": "Attack on Titan",
+          "@language": "en"
+        },
+        {
+          "@value": "進撃の巨人",
+          "@language": "ja"
+        }
+      ],
+      "alternateName": {
+        "@value": "Shingeki no Kyojin",
+        "@language": "ja-Latn"
+      },
+      "identifier": {
+        "@value": "tt2560140",
+        "@type": "xsd:string"
+      },
+      "sameAs": {
+        "@id": "https://www.imdb.com/title/tt2560140/"
+      },
+      "genre": [
+        "애니메이션",
+        "액션",
+        "어드벤처",
+        "드라마",
+        "판타지"
+      ],
+      "startDate": {
+        "@value": "2013-04-07",
+        "@type": "xsd:date"
+      },
+      "endDate": {
+        "@value": "2023-11-05",
+        "@type": "xsd:date"
+      },
+      "numberOfSeasons": 4,
+      "numberOfEpisodes": 94,
+      "countryOfOrigin": {
+        "@id": "place/japan"
+      },
+      "inLanguage": {
+        "@value": "ja",
+        "@type": "xsd:string"
+      },
+      "creator": {
+        "@id": "person/hajime-isayama"
+      },
+      "isBasedOn": {
+        "@id": "work/attack-on-titan-manga"
+      },
+      "productionCompany": [
+        {
+          "@id": "org/wit-studio"
+        },
+        {
+          "@id": "org/mappa"
+        }
+      ],
+      "containsSeason": [
+        {
+          "@id": "work/attack-on-titan/season-1"
+        },
+        {
+          "@id": "work/attack-on-titan/season-2"
+        },
+        {
+          "@id": "work/attack-on-titan/season-3"
+        },
+        {
+          "@id": "work/attack-on-titan/season-4"
+        }
+      ],
+      "character": [
+        {
+          "@id": "character/eren-yeager"
+        },
+        {
+          "@id": "character/mikasa-ackerman"
+        },
+        {
+          "@id": "character/armin-arlert"
+        },
+        {
+          "@id": "character/levi"
+        }
+      ],
+      "contentLocation": {
+        "@id": "place/walls"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": 9.1,
+        "bestRating": 10,
+        "ratingCount": 608000,
+        "description": "IMDb 평점 페이지 스냅샷 기준(날짜 미상). 비가중 평균 8.6."
+      },
+      "description": "거인에게 고향과 어머니를 잃은 엘런 예거가 거인을 모두 몰아내겠다고 맹세하고, 미카사·아르민과 함께 조사병단에 들어가 거인과 성벽 밖 세계의 진실에 다가가는 이야기.",
+      "giant:hasTheme": [
+        {
+          "@id": "theme/giant-as-mirror"
+        },
+        {
+          "@id": "theme/freedom"
+        },
+        {
+          "@id": "theme/cycle-of-war"
+        }
+      ],
+      "giant:comparableTo": {
+        "@id": "work/gullivers-travels"
+      },
+      "subjectOf": {
+        "@id": "https://github.com/solnaeum/practice/blob/main/attack_on_titan_imdb.md"
+      }
+    },
+    {
+      "@id": "work/attack-on-titan-manga",
+      "@type": "ComicSeries",
+      "name": [
+        "진격의 거인 (만화)",
+        {
+          "@value": "進撃の巨人",
+          "@language": "ja"
+        }
+      ],
+      "author": {
+        "@id": "person/hajime-isayama"
+      },
+      "publisher": {
+        "@id": "org/kodansha"
+      },
+      "isPartOf": {
+        "@id": "work/bessatsu-shonen-magazine"
+      },
+      "startDate": {
+        "@value": "2009-09-09",
+        "@type": "xsd:date"
+      },
+      "endDate": {
+        "@value": "2021-04-09",
+        "@type": "xsd:date"
+      },
+      "description": "전 34권."
+    },
+    {
+      "@id": "work/bessatsu-shonen-magazine",
+      "@type": "Periodical",
+      "name": [
+        "별책 소년 매거진",
+        {
+          "@value": "別冊少年マガジン",
+          "@language": "ja"
+        }
+      ],
+      "publisher": {
+        "@id": "org/kodansha"
+      }
+    },
+    {
+      "@id": "work/attack-on-titan/season-1",
+      "@type": "TVSeason",
+      "name": "진격의 거인 시즌 1",
+      "seasonNumber": 1,
+      "numberOfEpisodes": 25,
+      "startDate": {
+        "@value": "2013-04-07",
+        "@type": "xsd:date"
+      },
+      "endDate": {
+        "@value": "2013-09-29",
+        "@type": "xsd:date"
+      },
+      "partOfSeries": {
+        "@id": "work/attack-on-titan"
+      },
+      "productionCompany": {
+        "@id": "org/wit-studio"
+      }
+    },
+    {
+      "@id": "work/attack-on-titan/season-2",
+      "@type": "TVSeason",
+      "name": "진격의 거인 시즌 2",
+      "seasonNumber": 2,
+      "numberOfEpisodes": 12,
+      "startDate": {
+        "@value": "2017-04-01",
+        "@type": "xsd:date"
+      },
+      "endDate": {
+        "@value": "2017-06-17",
+        "@type": "xsd:date"
+      },
+      "partOfSeries": {
+        "@id": "work/attack-on-titan"
+      },
+      "productionCompany": {
+        "@id": "org/wit-studio"
+      }
+    },
+    {
+      "@id": "work/attack-on-titan/season-3",
+      "@type": "TVSeason",
+      "name": "진격의 거인 시즌 3",
+      "seasonNumber": 3,
+      "numberOfEpisodes": 22,
+      "description": "Part 1(12화)과 Part 2(10화)로 나뉘어 2018~2019년 방영.",
+      "partOfSeries": {
+        "@id": "work/attack-on-titan"
+      },
+      "productionCompany": {
+        "@id": "org/wit-studio"
+      }
+    },
+    {
+      "@id": "work/attack-on-titan/season-4",
+      "@type": "TVSeason",
+      "name": [
+        "진격의 거인 The Final Season",
+        {
+          "@value": "Attack on Titan: The Final Season",
+          "@language": "en"
+        }
+      ],
+      "seasonNumber": 4,
+      "numberOfEpisodes": 35,
+      "description": "2020~2023년 방영. 본편 35화와 특별편 2편.",
+      "partOfSeries": {
+        "@id": "work/attack-on-titan"
+      },
+      "productionCompany": {
+        "@id": "org/mappa"
+      }
+    },
+    {
+      "@id": "work/gullivers-travels",
+      "@type": "Book",
+      "name": [
+        "걸리버 여행기",
+        {
+          "@value": "Gulliver's Travels",
+          "@language": "en"
+        }
+      ],
+      "alternateName": {
+        "@value": "Travels into Several Remote Nations of the World",
+        "@language": "en"
+      },
+      "author": {
+        "@id": "person/jonathan-swift"
+      },
+      "datePublished": {
+        "@value": "1726",
+        "@type": "xsd:gYear"
+      },
+      "countryOfOrigin": {
+        "@id": "place/england"
+      },
+      "inLanguage": {
+        "@value": "en",
+        "@type": "xsd:string"
+      },
+      "genre": [
+        "풍자 소설",
+        "모험 소설"
+      ],
+      "hasPart": [
+        {
+          "@id": "work/gullivers-travels/part-1"
+        },
+        {
+          "@id": "work/gullivers-travels/part-2"
+        },
+        {
+          "@id": "work/gullivers-travels/part-3"
+        },
+        {
+          "@id": "work/gullivers-travels/part-4"
+        }
+      ],
+      "character": {
+        "@id": "character/lemuel-gulliver"
+      },
+      "description": "배의 외과의사 레뮤얼 걸리버가 직접 쓴 여행기 형식의 4부 구성 풍자 소설.",
+      "giant:hasTheme": [
+        {
+          "@id": "theme/giant-as-mirror"
+        },
+        {
+          "@id": "theme/satire-of-society"
+        },
+        {
+          "@id": "theme/relativity-of-scale"
+        }
+      ],
+      "giant:comparableTo": {
+        "@id": "work/attack-on-titan"
+      },
+      "subjectOf": {
+        "@id": "https://github.com/solnaeum/practice/blob/main/gullivers_travels_giants.md"
+      }
+    },
+    {
+      "@id": "work/gullivers-travels/part-1",
+      "@type": "CreativeWork",
+      "name": "1부 — 릴리퍼트 여행",
+      "position": 1,
+      "isPartOf": {
+        "@id": "work/gullivers-travels"
+      },
+      "contentLocation": [
+        {
+          "@id": "place/lilliput"
+        },
+        {
+          "@id": "place/blefuscu"
+        }
+      ],
+      "temporalCoverage": "1699",
+      "character": {
+        "@id": "character/lemuel-gulliver"
+      },
+      "description": "난파한 걸리버가 소인국 릴리퍼트에서 '인간 산'으로 불리는 거인이 된다. 블레퍼스쿠 함대를 끌고 와 영웅이 되지만, 반역죄로 몰려 도망친다.",
+      "giant:hasTheme": {
+        "@id": "theme/satire-of-society"
+      }
+    },
+    {
+      "@id": "work/gullivers-travels/part-2",
+      "@type": "CreativeWork",
+      "name": "2부 — 브롭딩낵 여행",
+      "position": 2,
+      "isPartOf": {
+        "@id": "work/gullivers-travels"
+      },
+      "contentLocation": {
+        "@id": "place/brobdingnag"
+      },
+      "temporalCoverage": "1702",
+      "character": [
+        {
+          "@id": "character/lemuel-gulliver"
+        },
+        {
+          "@id": "character/glumdalclitch"
+        },
+        {
+          "@id": "character/king-of-brobdingnag"
+        }
+      ],
+      "description": "거인국 브롭딩낵에서 걸리버가 소인이 된다. 구경거리가 되었다가 왕궁에 팔려 가고, 왕과 대화하며 인간 사회의 부패를 지적받는다. 독수리가 상자를 채 가면서 탈출한다.",
+      "giant:hasTheme": [
+        {
+          "@id": "theme/giant-as-mirror"
+        },
+        {
+          "@id": "theme/relativity-of-scale"
+        },
+        {
+          "@id": "theme/satire-of-society"
+        }
+      ]
+    },
+    {
+      "@id": "work/gullivers-travels/part-3",
+      "@type": "CreativeWork",
+      "name": "3부 — 라퓨타 등 여행",
+      "position": 3,
+      "isPartOf": {
+        "@id": "work/gullivers-travels"
+      },
+      "contentLocation": [
+        {
+          "@id": "place/laputa"
+        },
+        {
+          "@id": "place/luggnagg"
+        }
+      ],
+      "description": "하늘을 나는 섬 라퓨타의 학자들, 쓸모없는 연구, 죽지 않고 늙기만 하는 스트럴드브럭.",
+      "giant:hasTheme": {
+        "@id": "theme/satire-of-society"
+      }
+    },
+    {
+      "@id": "work/gullivers-travels/part-4",
+      "@type": "CreativeWork",
+      "name": "4부 — 후이늠의 나라 여행",
+      "position": 4,
+      "isPartOf": {
+        "@id": "work/gullivers-travels"
+      },
+      "contentLocation": {
+        "@id": "place/houyhnhnm-land"
+      },
+      "description": "이성적인 말 후이늠과 짐승 같은 인간 야후의 나라. 귀국한 걸리버는 인간을 견디지 못한다.",
+      "giant:hasTheme": {
+        "@id": "theme/satire-of-society"
+      }
+    },
+    {
+      "@id": "person/hajime-isayama",
+      "@type": "Person",
+      "name": [
+        "이사야마 하지메",
+        {
+          "@value": "Hajime Isayama",
+          "@language": "en"
+        },
+        {
+          "@value": "諫山創",
+          "@language": "ja"
+        }
+      ],
+      "jobTitle": "만화가",
+      "nationality": {
+        "@id": "place/japan"
+      }
+    },
+    {
+      "@id": "person/jonathan-swift",
+      "@type": "Person",
+      "name": [
+        "조너선 스위프트",
+        {
+          "@value": "Jonathan Swift",
+          "@language": "en"
+        }
+      ],
+      "jobTitle": "작가"
+    },
+    {
+      "@id": "person/yuki-kaji",
+      "@type": "Person",
+      "name": [
+        "카지 유키",
+        {
+          "@value": "Yuki Kaji",
+          "@language": "en"
+        }
+      ],
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/yui-ishikawa",
+      "@type": "Person",
+      "name": [
+        "이시카와 유이",
+        {
+          "@value": "Yui Ishikawa",
+          "@language": "en"
+        }
+      ],
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/marina-inoue",
+      "@type": "Person",
+      "name": [
+        "이노우에 마리나",
+        {
+          "@value": "Marina Inoue",
+          "@language": "en"
+        }
+      ],
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/hiroshi-kamiya",
+      "@type": "Person",
+      "name": [
+        "카미야 히로시",
+        {
+          "@value": "Hiroshi Kamiya",
+          "@language": "en"
+        }
+      ],
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/bryce-papenbrook",
+      "@type": "Person",
+      "name": {
+        "@value": "Bryce Papenbrook",
+        "@language": "en"
+      },
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/trina-nishimura",
+      "@type": "Person",
+      "name": {
+        "@value": "Trina Nishimura",
+        "@language": "en"
+      },
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/josh-grelle",
+      "@type": "Person",
+      "name": {
+        "@value": "Josh Grelle",
+        "@language": "en"
+      },
+      "alternateName": {
+        "@value": "Jessie James Grelle",
+        "@language": "en"
+      },
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "person/matthew-mercer",
+      "@type": "Person",
+      "name": {
+        "@value": "Matthew Mercer",
+        "@language": "en"
+      },
+      "jobTitle": "성우"
+    },
+    {
+      "@id": "org/wit-studio",
+      "@type": "Organization",
+      "name": {
+        "@value": "WIT STUDIO",
+        "@language": "en"
+      },
+      "description": "진격의 거인 시즌 1~3 제작."
+    },
+    {
+      "@id": "org/mappa",
+      "@type": "Organization",
+      "name": {
+        "@value": "MAPPA",
+        "@language": "en"
+      },
+      "description": "진격의 거인 시즌 4(The Final Season) 제작."
+    },
+    {
+      "@id": "org/kodansha",
+      "@type": "Organization",
+      "name": [
+        "고단샤",
+        {
+          "@value": "Kodansha",
+          "@language": "en"
+        }
+      ]
+    },
+    {
+      "@id": "place/japan",
+      "@type": "Country",
+      "name": [
+        "일본",
+        {
+          "@value": "Japan",
+          "@language": "en"
+        }
+      ]
+    },
+    {
+      "@id": "place/england",
+      "@type": "Country",
+      "name": [
+        "영국",
+        {
+          "@value": "England",
+          "@language": "en"
+        }
+      ]
+    },
+    {
+      "@id": "character/eren-yeager",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "엘런 예거",
+        {
+          "@value": "Eren Yeager",
+          "@language": "en"
+        }
+      ],
+      "description": "고향과 어머니를 거인에게 잃고 거인을 모두 몰아내겠다고 맹세한 주인공.",
+      "giant:species": {
+        "@id": "species/human-aot"
+      },
+      "giant:memberOf": {
+        "@id": "org/survey-corps"
+      },
+      "knows": [
+        {
+          "@id": "character/mikasa-ackerman"
+        },
+        {
+          "@id": "character/armin-arlert"
+        }
+      ],
+      "giant:japaneseVoice": {
+        "@id": "person/yuki-kaji"
+      },
+      "giant:englishVoice": {
+        "@id": "person/bryce-papenbrook"
+      }
+    },
+    {
+      "@id": "character/mikasa-ackerman",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "미카사 아커만",
+        {
+          "@value": "Mikasa Ackerman",
+          "@language": "en"
+        }
+      ],
+      "description": "엘런의 소꿉친구.",
+      "giant:species": {
+        "@id": "species/human-aot"
+      },
+      "giant:memberOf": {
+        "@id": "org/survey-corps"
+      },
+      "knows": [
+        {
+          "@id": "character/eren-yeager"
+        },
+        {
+          "@id": "character/armin-arlert"
+        }
+      ],
+      "giant:japaneseVoice": {
+        "@id": "person/yui-ishikawa"
+      },
+      "giant:englishVoice": {
+        "@id": "person/trina-nishimura"
+      }
+    },
+    {
+      "@id": "character/armin-arlert",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "아르민 알레르토",
+        {
+          "@value": "Armin Arlert",
+          "@language": "en"
+        }
+      ],
+      "description": "엘런의 소꿉친구.",
+      "giant:species": {
+        "@id": "species/human-aot"
+      },
+      "giant:memberOf": {
+        "@id": "org/survey-corps"
+      },
+      "knows": [
+        {
+          "@id": "character/eren-yeager"
+        },
+        {
+          "@id": "character/mikasa-ackerman"
+        }
+      ],
+      "giant:japaneseVoice": {
+        "@id": "person/marina-inoue"
+      },
+      "giant:englishVoice": {
+        "@id": "person/josh-grelle"
+      }
+    },
+    {
+      "@id": "character/levi",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "리바이",
+        {
+          "@value": "Levi",
+          "@language": "en"
+        }
+      ],
+      "giant:species": {
+        "@id": "species/human-aot"
+      },
+      "giant:memberOf": {
+        "@id": "org/survey-corps"
+      },
+      "giant:japaneseVoice": {
+        "@id": "person/hiroshi-kamiya"
+      },
+      "giant:englishVoice": {
+        "@id": "person/matthew-mercer"
+      }
+    },
+    {
+      "@id": "org/survey-corps",
+      "@type": "giant:FictionalOrganization",
+      "name": [
+        "조사병단",
+        {
+          "@value": "Survey Corps",
+          "@language": "en"
+        }
+      ],
+      "description": "성벽 밖으로 나가 거인과 싸우며 바깥 세계를 조사하는 병단.",
+      "location": {
+        "@id": "place/walls"
+      }
+    },
+    {
+      "@id": "place/walls",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "성벽 안 세계",
+        {
+          "@value": "The Walls",
+          "@language": "en"
+        }
+      ],
+      "description": "거인을 피해 인류가 살아가는 세 겹의 거대한 성벽."
+    },
+    {
+      "@id": "species/titan",
+      "@type": "giant:Species",
+      "name": [
+        "거인",
+        {
+          "@value": "Titan",
+          "@language": "en"
+        }
+      ],
+      "description": "사람을 잡아먹는 거대한 인간형 생물. 어느 날 초대형 거인이 성벽을 부순다.",
+      "giant:isGiant": true,
+      "subjectOf": {
+        "@id": "work/attack-on-titan"
+      }
+    },
+    {
+      "@id": "species/human-aot",
+      "@type": "giant:Species",
+      "name": "인류 (진격의 거인)",
+      "giant:isGiant": false,
+      "giant:scaleRelativeToHuman": 1,
+      "giant:inhabits": {
+        "@id": "place/walls"
+      },
+      "subjectOf": {
+        "@id": "work/attack-on-titan"
+      }
+    },
+    {
+      "@id": "character/lemuel-gulliver",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "레뮤얼 걸리버",
+        {
+          "@value": "Lemuel Gulliver",
+          "@language": "en"
+        }
+      ],
+      "jobTitle": "배의 외과의사",
+      "description": "릴리퍼트에서는 거인이, 브롭딩낵에서는 소인이 되는 주인공이자 화자.",
+      "giant:species": {
+        "@id": "species/human-gulliver"
+      },
+      "homeLocation": {
+        "@id": "place/england"
+      }
+    },
+    {
+      "@id": "character/glumdalclitch",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "글럼달클리치",
+        {
+          "@value": "Glumdalclitch",
+          "@language": "en"
+        }
+      ],
+      "description": "걸리버를 발견한 농부의 아홉 살 난 딸. '작은 유모'라는 뜻으로, 걸리버를 돌보며 왕궁까지 함께 간다.",
+      "giant:species": {
+        "@id": "species/brobdingnagian"
+      },
+      "knows": {
+        "@id": "character/lemuel-gulliver"
+      }
+    },
+    {
+      "@id": "character/king-of-brobdingnag",
+      "@type": "giant:FictionalCharacter",
+      "name": [
+        "브롭딩낵의 왕",
+        {
+          "@value": "King of Brobdingnag",
+          "@language": "en"
+        }
+      ],
+      "description": "걸리버의 설명을 듣고 그의 동족을 '가장 해로운 작고 혐오스러운 벌레들'이라 평하며, 화약 제조법 제안을 거절한다.",
+      "giant:species": {
+        "@id": "species/brobdingnagian"
+      },
+      "knows": {
+        "@id": "character/lemuel-gulliver"
+      }
+    },
+    {
+      "@id": "species/human-gulliver",
+      "@type": "giant:Species",
+      "name": "인간 (걸리버 여행기)",
+      "giant:isGiant": false,
+      "giant:scaleRelativeToHuman": 1,
+      "subjectOf": {
+        "@id": "work/gullivers-travels"
+      }
+    },
+    {
+      "@id": "species/lilliputian",
+      "@type": "giant:Species",
+      "name": [
+        "릴리퍼트 사람 (소인)",
+        {
+          "@value": "Lilliputian",
+          "@language": "en"
+        }
+      ],
+      "description": "키 15cm 남짓한 소인. 이들 앞에서 걸리버는 '인간 산'이 된다.",
+      "giant:isGiant": false,
+      "giant:scaleRelativeToHuman": 0.083,
+      "giant:inhabits": [
+        {
+          "@id": "place/lilliput"
+        },
+        {
+          "@id": "place/blefuscu"
+        }
+      ],
+      "subjectOf": {
+        "@id": "work/gullivers-travels"
+      }
+    },
+    {
+      "@id": "species/brobdingnagian",
+      "@type": "giant:Species",
+      "name": [
+        "브롭딩낵 사람 (거인)",
+        {
+          "@value": "Brobdingnagian",
+          "@language": "en"
+        }
+      ],
+      "description": "키가 교회 첨탑만 한 거인. 전쟁보다 농사와 실용적인 지식을 중시하는 평화로운 사람들.",
+      "giant:isGiant": true,
+      "giant:scaleRelativeToHuman": 12,
+      "giant:inhabits": {
+        "@id": "place/brobdingnag"
+      },
+      "subjectOf": {
+        "@id": "work/gullivers-travels"
+      }
+    },
+    {
+      "@id": "species/houyhnhnm",
+      "@type": "giant:Species",
+      "name": [
+        "후이늠",
+        {
+          "@value": "Houyhnhnm",
+          "@language": "en"
+        }
+      ],
+      "description": "이성적이고 정직한 말(馬).",
+      "giant:isGiant": false,
+      "giant:inhabits": {
+        "@id": "place/houyhnhnm-land"
+      },
+      "subjectOf": {
+        "@id": "work/gullivers-travels"
+      }
+    },
+    {
+      "@id": "species/yahoo",
+      "@type": "giant:Species",
+      "name": [
+        "야후",
+        {
+          "@value": "Yahoo",
+          "@language": "en"
+        }
+      ],
+      "description": "후이늠의 나라에서 짐승처럼 사는 인간.",
+      "giant:isGiant": false,
+      "giant:inhabits": {
+        "@id": "place/houyhnhnm-land"
+      },
+      "subjectOf": {
+        "@id": "work/gullivers-travels"
+      }
+    },
+    {
+      "@id": "place/lilliput",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "릴리퍼트",
+        {
+          "@value": "Lilliput",
+          "@language": "en"
+        }
+      ],
+      "description": "소인국."
+    },
+    {
+      "@id": "place/blefuscu",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "블레퍼스쿠",
+        {
+          "@value": "Blefuscu",
+          "@language": "en"
+        }
+      ],
+      "description": "달걀 깨는 방향을 두고 릴리퍼트와 전쟁 중인 이웃 소인국."
+    },
+    {
+      "@id": "place/brobdingnag",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "브롭딩낵",
+        {
+          "@value": "Brobdingnag",
+          "@language": "en"
+        }
+      ],
+      "description": "거인국."
+    },
+    {
+      "@id": "place/laputa",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "라퓨타",
+        {
+          "@value": "Laputa",
+          "@language": "en"
+        }
+      ],
+      "description": "하늘을 떠다니는 섬."
+    },
+    {
+      "@id": "place/luggnagg",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "러그낵",
+        {
+          "@value": "Luggnagg",
+          "@language": "en"
+        }
+      ],
+      "description": "죽지 않는 스트럴드브럭이 사는 나라."
+    },
+    {
+      "@id": "place/houyhnhnm-land",
+      "@type": "giant:FictionalPlace",
+      "name": [
+        "후이늠의 나라",
+        {
+          "@value": "Land of the Houyhnhnms",
+          "@language": "en"
+        }
+      ]
+    },
+    {
+      "@id": "theme/giant-as-mirror",
+      "@type": "giant:Theme",
+      "name": "거인을 거울 삼아 인간을 돌아봄",
+      "description": "두 작품의 공통 주제. 거인을 무찔러야 할 괴물로만 그리지 않고, 인간이 얼마나 작고 잔혹한지 비추는 거울로 쓴다."
+    },
+    {
+      "@id": "theme/freedom",
+      "@type": "giant:Theme",
+      "name": "자유"
+    },
+    {
+      "@id": "theme/cycle-of-war",
+      "@type": "giant:Theme",
+      "name": "전쟁과 증오의 악순환"
+    },
+    {
+      "@id": "theme/satire-of-society",
+      "@type": "giant:Theme",
+      "name": "인간 사회의 부패와 전쟁 풍자"
+    },
+    {
+      "@id": "theme/relativity-of-scale",
+      "@type": "giant:Theme",
+      "name": "크기와 관점의 상대성",
+      "description": "같은 인간도 보는 크기에 따라 아름다움과 추함이 달라진다."
+    }
+  ]
+}
+</script>
+<script>
+(function () {
+  "use strict";
+
+  const doc = JSON.parse(document.getElementById("titan-data").textContent);
+  const ctx = doc["@context"];
+  const SCHEMA = "https://schema.org/";
+
+  // ---------- IRI helpers ----------
+  const prefixes = {};
+  for (const [k, v] of Object.entries(ctx)) {
+    if (typeof v === "string" && !k.startsWith("@")) prefixes[k] = v;
+  }
+  function expand(id) {
+    const i = id.indexOf(":");
+    if (i > 0 && prefixes[id.slice(0, i)] && !id.startsWith("http")) return prefixes[id.slice(0, i)] + id.slice(i + 1);
+    if (/^[a-z]+:\/\//i.test(id)) return id;
+    return (ctx["@base"] || "") + id;
+  }
+  function expandTerm(t) {
+    return t.includes(":") ? expand(t) : (ctx["@vocab"] || SCHEMA) + t;
+  }
+  function compact(iri) {
+    for (const [k, v] of Object.entries(prefixes)) if (iri.startsWith(v) && k !== "schema") return k + ":" + iri.slice(v.length);
+    if (iri.startsWith(SCHEMA)) return "schema:" + iri.slice(SCHEMA.length);
+    return iri;
+  }
+  const asArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
+  const isRef = (v) => v && typeof v === "object" && Object.keys(v).length === 1 && "@id" in v;
+
+  function literalText(v) {
+    if (v === null || v === undefined) return "";
+    if (typeof v !== "object") return String(v);
+    if ("@value" in v) return String(v["@value"]) + (v["@language"] ? " (" + v["@language"] + ")" : "");
+    return null;
+  }
+  function koName(names) {
+    const arr = asArray(names);
+    for (const n of arr) if (typeof n === "string") return n;
+    for (const n of arr) if (n && n["@value"]) return n["@value"];
+    return null;
+  }
+
+  // ---------- Labels for schema.org properties ----------
+  const propLabel = {
+    "schema:creator": "원작자", "schema:author": "작가", "schema:isBasedOn": "원작",
+    "schema:productionCompany": "제작사", "schema:containsSeason": "시즌", "schema:partOfSeries": "소속 시리즈",
+    "schema:character": "등장인물", "schema:contentLocation": "배경", "schema:countryOfOrigin": "제작 국가",
+    "schema:publisher": "출판사", "schema:isPartOf": "수록", "schema:hasPart": "구성", "schema:knows": "아는 사이",
+    "schema:location": "위치", "schema:homeLocation": "고향", "schema:nationality": "국적", "schema:subjectOf": "등장 작품",
+    "schema:sameAs": "같은 대상", "rdfs:subClassOf": "하위 클래스", "rdf:type": "유형",
+    "schema:name": "이름", "schema:alternateName": "다른 이름", "schema:identifier": "식별자", "schema:genre": "장르",
+    "schema:startDate": "시작", "schema:endDate": "종료", "schema:datePublished": "발표", "schema:numberOfSeasons": "시즌 수",
+    "schema:numberOfEpisodes": "에피소드 수", "schema:seasonNumber": "시즌 번호", "schema:inLanguage": "언어",
+    "schema:description": "설명", "schema:jobTitle": "직업", "schema:position": "순서", "schema:temporalCoverage": "시기",
+    "schema:aggregateRating": "평점", "schema:ratingValue": "평점", "schema:bestRating": "만점", "schema:ratingCount": "투표 수"
+  };
+  // Inverse pairs: draw only one direction when both are present.
+  const inverseOf = { "schema:partOfSeries": "schema:containsSeason", "schema:isPartOf": "schema:hasPart" };
+  const symmetric = new Set(["giant:comparableTo", "schema:knows"]);
+
+  // ---------- Groups ----------
+  const groups = [
+    { key: "work", label: "작품", types: ["TVSeries", "TVSeason", "Book", "ComicSeries", "Periodical", "CreativeWork"] },
+    { key: "character", label: "등장인물", types: ["giant:FictionalCharacter"] },
+    { key: "person", label: "실존 인물", types: ["Person"] },
+    { key: "org", label: "조직", types: ["Organization", "giant:FictionalOrganization"] },
+    { key: "place", label: "장소", types: ["Country", "Place", "giant:FictionalPlace"] },
+    { key: "species", label: "종족", types: ["giant:Species"] },
+    { key: "theme", label: "주제", types: ["giant:Theme"] },
+    { key: "class", label: "온톨로지 클래스", types: [] }
+  ];
+  const groupOfType = {};
+  groups.forEach((g) => g.types.forEach((t) => (groupOfType[expandTerm(t)] = g.key)));
+
+  // ---------- Build nodes and edges ----------
+  const graph = doc["@graph"];
+  const byIri = new Map();
+  const propDefs = new Map(); // property IRI -> label
+  const classDefs = [];
+
+  for (const n of graph) {
+    const iri = expand(n["@id"]);
+    const types = asArray(n["@type"]).map(expandTerm);
+    if (types.includes(expandTerm("rdf:Property"))) {
+      propDefs.set(iri, koName(n["rdfs:label"]) || compact(iri));
+      continue;
+    }
+    if (types.includes(expandTerm("owl:Ontology"))) continue;
+    if (types.includes(expandTerm("rdfs:Class"))) { classDefs.push(n); continue; }
+    byIri.set(iri, { iri, raw: n, types, group: types.map((t) => groupOfType[t]).find(Boolean) || "work" });
+  }
+
+  // Class nodes: the custom classes plus every schema.org type actually used.
+  const classNodes = new Map();
+  function addClass(iri, raw) {
+    if (classNodes.has(iri)) return classNodes.get(iri);
+    const c = { iri, raw: raw || null, types: [expandTerm("rdfs:Class")], group: "class", isClass: true };
+    classNodes.set(iri, c);
+    return c;
+  }
+  classDefs.forEach((c) => addClass(expand(c["@id"]), c));
+  byIri.forEach((n) => n.types.forEach((t) => addClass(t)));
+  classDefs.forEach((c) => asArray(c["rdfs:subClassOf"]).forEach((s) => addClass(expand(s["@id"]))));
+
+  function labelOf(n) {
+    if (n.raw) {
+      const nm = koName(n.raw["name"]) || koName(n.raw["rdfs:label"]);
+      if (nm) return nm;
+    }
+    return compact(n.iri);
+  }
+  function propName(key) {
+    const iri = expandTerm(key);
+    if (propDefs.has(iri)) return propDefs.get(iri);
+    return propLabel[compact(iri)] || propLabel[key] || compact(iri);
+  }
+
+  const allEdges = [];
+  const edgeKeys = new Set();
+  function addEdge(s, t, key, isTypeEdge) {
+    const pc = compact(expandTerm(key));
+    const k = s + "|" + pc + "|" + t;
+    if (edgeKeys.has(k)) return;
+    if (symmetric.has(pc) && edgeKeys.has(t + "|" + pc + "|" + s)) return;
+    edgeKeys.add(k);
+    allEdges.push({ source: s, target: t, prop: pc, label: isTypeEdge ? "유형" : propName(key), symmetric: symmetric.has(pc), typeEdge: !!isTypeEdge });
+  }
+  byIri.forEach((n) => {
+    for (const [key, val] of Object.entries(n.raw)) {
+      if (key.startsWith("@")) continue;
+      for (const v of asArray(val)) {
+        if (!isRef(v)) continue;
+        const t = expand(v["@id"]);
+        if (!byIri.has(t)) continue;
+        const pc = compact(expandTerm(key));
+        if (inverseOf[pc] && asArray(byIri.get(t).raw[inverseOf[pc].replace("schema:", "")]).some((x) => isRef(x) && expand(x["@id"]) === n.iri)) continue;
+        addEdge(n.iri, t, key);
+      }
+    }
+    n.types.forEach((t) => addEdge(n.iri, t, "rdf:type", true));
+  });
+  classDefs.forEach((c) => asArray(c["rdfs:subClassOf"]).forEach((s) => addEdge(expand(c["@id"]), expand(s["@id"]), "rdfs:subClassOf")));
+
+  const nodes = [...byIri.values(), ...classNodes.values()];
+  const nodeByIri = new Map(nodes.map((n) => [n.iri, n]));
+  nodes.forEach((n) => { n.label = labelOf(n); n.degree = 0; });
+  allEdges.forEach((e) => { if (!e.typeEdge) { nodeByIri.get(e.source).degree++; nodeByIri.get(e.target).degree++; } });
+
+  // ---------- State ----------
+  const hiddenGroups = new Set(["class"]);
+  let showLabels = false;
+  let selected = null;
+  let searchTerm = "";
+
+  // ---------- SVG ----------
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("graph");
+  const viewport = document.getElementById("viewport");
+  const gEdges = document.getElementById("edges");
+  const gLabels = document.getElementById("elabels");
+  const gNodes = document.getElementById("nodes");
+  const color = (g) => `var(--g-${g})`;
+  const radius = (n) => (n.isClass ? 8 : 6 + Math.min(10, Math.sqrt(n.degree) * 2.4));
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  nodes.forEach((n) => {
+    const g = el("g", { class: "node" + (n.isClass ? " class-node" : ""), tabindex: "0", role: "button", "aria-label": n.label }, gNodes);
+    el("circle", { r: radius(n), fill: color(n.group) }, g);
+    const t = el("text", { x: radius(n) + 4, y: 4 }, g);
+    t.textContent = n.label;
+    n.el = g;
+    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n); } });
+    g.addEventListener("pointerdown", (ev) => startDrag(ev, n));
+  });
+  allEdges.forEach((e) => {
+    e.s = nodeByIri.get(e.source);
+    e.t = nodeByIri.get(e.target);
+    e.el = el("path", { class: "edge", "marker-end": e.symmetric ? "" : "url(#arrow)" }, gEdges);
+    if (e.typeEdge) e.el.setAttribute("stroke-dasharray", "3 3");
+    e.lel = el("text", { class: "elabel", "text-anchor": "middle" }, gLabels);
+    e.lel.textContent = e.label;
+  });
+
+  // ---------- Visibility ----------
+  const visible = (n) => !hiddenGroups.has(n.group);
+  const edgeVisible = (e) => visible(e.s) && visible(e.t) && (!e.typeEdge || !hiddenGroups.has("class"));
+  function applyVisibility() {
+    nodes.forEach((n) => (n.el.style.display = visible(n) ? "" : "none"));
+    allEdges.forEach((e) => {
+      const v = edgeVisible(e);
+      e.el.style.display = v ? "" : "none";
+      e.lel.style.display = v ? "" : "none";
+    });
+    const vn = nodes.filter(visible).length;
+    const ve = allEdges.filter(edgeVisible).length;
+    document.getElementById("stats").textContent = `노드 ${vn}개 · 엣지 ${ve}개`;
+    applyHighlight();
+  }
+
+  function applyHighlight() {
+    const term = searchTerm.trim().toLowerCase();
+    const matches = term ? new Set(nodes.filter((n) => visible(n) && (n.label.toLowerCase().includes(term) || n.iri.toLowerCase().includes(term))).map((n) => n.iri)) : null;
+    let focus = null;
+    if (selected) {
+      focus = new Set([selected.iri]);
+      allEdges.forEach((e) => {
+        if (!edgeVisible(e)) return;
+        if (e.source === selected.iri) focus.add(e.target);
+        if (e.target === selected.iri) focus.add(e.source);
+      });
+    }
+    nodes.forEach((n) => {
+      const dim = (focus && !focus.has(n.iri)) || (matches && !matches.has(n.iri));
+      n.el.classList.toggle("dim", !!dim);
+      n.el.classList.toggle("selected", selected === n);
+    });
+    allEdges.forEach((e) => {
+      const hi = !!selected && (e.source === selected.iri || e.target === selected.iri);
+      const dim = (selected && !hi) || (matches && !(matches.has(e.source) && matches.has(e.target)));
+      e.el.classList.toggle("hi", hi);
+      e.el.classList.toggle("dim", !!dim);
+      if (!e.symmetric) e.el.setAttribute("marker-end", hi ? "url(#arrow-hi)" : "url(#arrow)");
+      e.lel.classList.toggle("hi", hi);
+      e.lel.classList.toggle("dim", !!dim);
+      e.lel.style.visibility = showLabels || hi ? "visible" : "hidden";
+    });
+  }
+
+  // ---------- Legend ----------
+  const legend = document.getElementById("legend");
+  groups.forEach((g) => {
+    const count = nodes.filter((n) => n.group === g.key).length;
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !hiddenGroups.has(g.key);
+    cb.addEventListener("change", () => {
+      if (cb.checked) hiddenGroups.delete(g.key); else hiddenGroups.add(g.key);
+      if (g.key === "class") document.getElementById("showOntology").checked = cb.checked;
+      if (selected && !visible(selected)) select(null);
+      applyVisibility();
+      settle();
+    });
+    const sw = document.createElement("span");
+    sw.className = "swatch" + (g.key === "class" ? " dashed" : "");
+    sw.style.background = color(g.key);
+    const name = document.createElement("span");
+    name.textContent = g.label;
+    const c = document.createElement("span");
+    c.className = "count";
+    c.textContent = count;
+    lab.append(cb, sw, name, c);
+    legend.appendChild(lab);
+    g.checkbox = cb;
+  });
+
+  // ---------- Detail panel ----------
+  const detail = document.getElementById("detail");
+  function renderDetail(n) {
+    detail.innerHTML = "";
+    if (!n) {
+      detail.innerHTML = '<h2>노드를 선택하세요</h2><p class="hint">노드를 누르면 속성과 연결된 관계가 여기에 나옵니다. 끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다.</p>';
+      return;
+    }
+    const h = document.createElement("h2");
+    h.textContent = n.label;
+    detail.appendChild(h);
+    n.types.forEach((t) => {
+      const chip = document.createElement("span");
+      chip.className = "type-chip";
+      chip.textContent = compact(t);
+      detail.appendChild(chip);
+    });
+    const iri = document.createElement("div");
+    iri.className = "iri";
+    iri.textContent = n.iri;
+    detail.appendChild(iri);
+
+    // Literal properties
+    const rows = [];
+    if (n.raw) {
+      for (const [key, val] of Object.entries(n.raw)) {
+        if (key.startsWith("@")) continue;
+        for (const v of asArray(val)) {
+          if (isRef(v)) {
+            const t = expand(v["@id"]);
+            if (!byIri.has(t) && !classNodes.has(t)) rows.push([propName(key), { link: t }]);
+            continue;
+          }
+          const text = literalText(v);
+          if (text !== null) { rows.push([propName(key), text]); continue; }
+          // nested object (e.g. AggregateRating)
+          const parts = [];
+          for (const [k2, v2] of Object.entries(v)) {
+            if (k2.startsWith("@")) continue;
+            parts.push(propName(k2) + " " + asArray(v2).map(literalText).join(", "));
+          }
+          rows.push([propName(key), parts.join(" · ")]);
+        }
+      }
+    }
+    if (rows.length) {
+      const h3 = document.createElement("h3");
+      h3.textContent = "속성";
+      detail.appendChild(h3);
+      const dl = document.createElement("dl");
+      rows.forEach(([k, v]) => {
+        const dt = document.createElement("dt");
+        dt.textContent = k;
+        const dd = document.createElement("dd");
+        if (typeof v === "object") {
+          const a = document.createElement("a");
+          a.href = v.link;
+          a.target = "_blank";
+          a.rel = "noopener";
+          a.textContent = v.link.replace(/^https?:\/\//, "");
+          dd.appendChild(a);
+        } else dd.textContent = v;
+        dl.append(dt, dd);
+      });
+      detail.appendChild(dl);
+    }
+
+    // Relations
+    const out = allEdges.filter((e) => edgeVisible(e) && e.source === n.iri);
+    const inc = allEdges.filter((e) => edgeVisible(e) && e.target === n.iri);
+    [["나가는 관계", out, "t"], ["들어오는 관계", inc, "s"]].forEach(([title, list, side]) => {
+      if (!list.length) return;
+      const h3 = document.createElement("h3");
+      h3.textContent = `${title} (${list.length})`;
+      detail.appendChild(h3);
+      const box = document.createElement("div");
+      box.className = "rel";
+      list.forEach((e) => {
+        const row = document.createElement("div");
+        const p = document.createElement("span");
+        p.className = "p";
+        p.textContent = e.label + " → ";
+        const b = document.createElement("button");
+        b.className = "link";
+        b.type = "button";
+        b.textContent = e[side].label;
+        b.addEventListener("click", () => select(e[side]));
+        row.append(p, b);
+        box.appendChild(row);
+      });
+      detail.appendChild(box);
+    });
+  }
+
+  function select(n) {
+    selected = n;
+    renderDetail(n);
+    applyHighlight();
+  }
+
+  // ---------- Force layout ----------
+  let W = 800, H = 600;
+  function resize() {
+    const r = svg.getBoundingClientRect();
+    W = r.width || 800; H = r.height || 600;
+  }
+  resize();
+  window.addEventListener("resize", () => { resize(); });
+
+  function seed() {
+    const keys = groups.map((g) => g.key);
+    nodes.forEach((n, i) => {
+      const gi = keys.indexOf(n.group);
+      const a = (gi / keys.length) * Math.PI * 2 + (i % 7) * 0.18;
+      const rr = Math.min(W, H) * 0.32 + (i % 5) * 14;
+      n.x = W / 2 + Math.cos(a) * rr;
+      n.y = H / 2 + Math.sin(a) * rr;
+      n.vx = 0; n.vy = 0;
+    });
+  }
+  seed();
+
+  let alpha = 1;
+  let running = false;
+  function tick() {
+    const vis = nodes.filter(visible);
+    const es = allEdges.filter(edgeVisible);
+    const k = Math.sqrt((W * H) / Math.max(vis.length, 1)) * 0.38;
+    // repulsion
+    for (let i = 0; i < vis.length; i++) {
+      const a = vis[i];
+      for (let j = i + 1; j < vis.length; j++) {
+        const b = vis[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 0.01) { dx = Math.random() - 0.5; dy = Math.random() - 0.5; d2 = 0.25; }
+        const d = Math.sqrt(d2);
+        const f = (k * k * k) / d2 * 0.5;
+        const fx = (dx / d) * f, fy = (dy / d) * f;
+        a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+      }
+    }
+    // springs
+    es.forEach((e) => {
+      const a = e.s, b = e.t;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      const rest = e.typeEdge ? k * 1.4 : k * 0.9;
+      const f = (d - rest) * 0.06;
+      const fx = (dx / d) * f, fy = (dy / d) * f;
+      a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+    });
+    // gravity + integrate
+    vis.forEach((n) => {
+      n.vx += (W / 2 - n.x) * 0.02;
+      n.vy += (H / 2 - n.y) * 0.02;
+      if (n.fixed) { n.vx = 0; n.vy = 0; return; }
+      const cap = 40;
+      n.x += Math.max(-cap, Math.min(cap, n.vx * alpha * 0.1));
+      n.y += Math.max(-cap, Math.min(cap, n.vy * alpha * 0.1));
+      n.vx *= 0.5; n.vy *= 0.5;
+    });
+    alpha *= 0.985;
+  }
+
+  function draw() {
+    nodes.forEach((n) => n.el.setAttribute("transform", `translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`));
+    allEdges.forEach((e) => {
+      const a = e.s, b = e.t;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const ra = radius(a), rb = radius(b) + (e.symmetric ? 0 : 3);
+      const x1 = a.x + (dx / d) * ra, y1 = a.y + (dy / d) * ra;
+      const x2 = b.x - (dx / d) * rb, y2 = b.y - (dy / d) * rb;
+      e.el.setAttribute("d", `M${x1.toFixed(1)},${y1.toFixed(1)} L${x2.toFixed(1)},${y2.toFixed(1)}`);
+      e.lel.setAttribute("x", ((x1 + x2) / 2).toFixed(1));
+      e.lel.setAttribute("y", ((y1 + y2) / 2 - 3).toFixed(1));
+    });
+  }
+
+  function loop() {
+    for (let i = 0; i < 2; i++) tick();
+    draw();
+    if (alpha > 0.02) requestAnimationFrame(loop);
+    else running = false;
+  }
+  function reheat(a) {
+    alpha = Math.max(alpha, a);
+    if (!running) { running = true; requestAnimationFrame(loop); }
+  }
+  // ---------- Pan / zoom / drag ----------
+  let view = { x: 0, y: 0, s: 1 };
+  function applyView() { viewport.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.s})`); }
+  // Scale and center the visible nodes (labels included) to fill the stage.
+  function fitView() {
+    const vis = nodes.filter(visible);
+    if (!vis.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    vis.forEach((n) => {
+      x0 = Math.min(x0, n.x - 12); y0 = Math.min(y0, n.y - 12);
+      x1 = Math.max(x1, n.x + 12 + n.label.length * 11); y1 = Math.max(y1, n.y + 12);
+    });
+    const pad = 24;
+    const s = Math.max(0.25, Math.min(2, Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0))));
+    view = { s, x: (W - (x1 - x0) * s) / 2 - x0 * s, y: (H - (y1 - y0) * s) / 2 - y0 * s };
+    applyView();
+  }
+  function settle() {
+    alpha = 1;
+    for (let i = 0; i < 400; i++) tick();
+    draw();
+    fitView();
+  }
+  // Lay out fully before the first paint, then keep the simulation idle until something moves.
+  settle();
+  function toGraph(cx, cy) {
+    const r = svg.getBoundingClientRect();
+    return { x: (cx - r.left - view.x) / view.s, y: (cy - r.top - view.y) / view.s };
+  }
+  function zoomAt(cx, cy, factor) {
+    const r = svg.getBoundingClientRect();
+    const px = cx - r.left, py = cy - r.top;
+    const ns = Math.max(0.25, Math.min(4, view.s * factor));
+    view.x = px - ((px - view.x) * ns) / view.s;
+    view.y = py - ((py - view.y) * ns) / view.s;
+    view.s = ns;
+    applyView();
+  }
+  svg.addEventListener("wheel", (ev) => { ev.preventDefault(); zoomAt(ev.clientX, ev.clientY, Math.exp(-ev.deltaY * 0.0015)); }, { passive: false });
+
+  const pointers = new Map();
+  let dragNode = null, panStart = null, pinchStart = null, moved = false;
+  function startDrag(ev, n) {
+    ev.stopPropagation();
+    dragNode = n;
+    n.fixed = true;
+    moved = false;
+    svg.setPointerCapture(ev.pointerId);
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  }
+  svg.addEventListener("pointerdown", (ev) => {
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    svg.setPointerCapture(ev.pointerId);
+    moved = false;
+    if (pointers.size === 2) {
+      const [p1, p2] = [...pointers.values()];
+      pinchStart = { d: Math.hypot(p1.x - p2.x, p1.y - p2.y), s: view.s };
+      panStart = null;
+    } else if (!dragNode) {
+      panStart = { x: ev.clientX - view.x, y: ev.clientY - view.y };
+      svg.classList.add("panning");
+    }
+  });
+  svg.addEventListener("pointermove", (ev) => {
+    if (!pointers.has(ev.pointerId)) return;
+    const prev = pointers.get(ev.pointerId);
+    if (Math.hypot(ev.clientX - prev.x, ev.clientY - prev.y) > 2) moved = true;
+    pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pinchStart && pointers.size === 2) {
+      const [p1, p2] = [...pointers.values()];
+      const d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+      zoomAt((p1.x + p2.x) / 2, (p1.y + p2.y) / 2, (pinchStart.s * d) / pinchStart.d / view.s);
+    } else if (dragNode) {
+      const p = toGraph(ev.clientX, ev.clientY);
+      dragNode.x = p.x; dragNode.y = p.y;
+      draw();
+      reheat(0.3);
+    } else if (panStart) {
+      view.x = ev.clientX - panStart.x;
+      view.y = ev.clientY - panStart.y;
+      applyView();
+    }
+  });
+  function endPointer(ev) {
+    pointers.delete(ev.pointerId);
+    if (pointers.size < 2) pinchStart = null;
+    if (dragNode && pointers.size === 0) { dragNode.fixed = false; dragNode = null; }
+    if (pointers.size === 0) { panStart = null; svg.classList.remove("panning"); }
+  }
+  // Pointer capture sends the pointerup to the svg, so node clicks are resolved here.
+  svg.addEventListener("pointerup", (ev) => {
+    const clickedNode = !moved && dragNode;
+    const clickedBlank = !moved && panStart && !dragNode;
+    endPointer(ev);
+    if (clickedNode) select(clickedNode);
+    else if (clickedBlank) select(null);
+  });
+  svg.addEventListener("pointercancel", endPointer);
+
+  // ---------- Controls ----------
+  document.getElementById("search").addEventListener("input", (ev) => { searchTerm = ev.target.value; applyHighlight(); });
+  document.getElementById("showLabels").addEventListener("change", (ev) => { showLabels = ev.target.checked; applyHighlight(); });
+  document.getElementById("showOntology").addEventListener("change", (ev) => {
+    const g = groups.find((x) => x.key === "class");
+    g.checkbox.checked = ev.target.checked;
+    g.checkbox.dispatchEvent(new Event("change"));
+  });
+  document.getElementById("reset").addEventListener("click", () => {
+    resize();
+    seed();
+    settle();
+  });
+  document.getElementById("theme").addEventListener("click", () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+  });
+
+  applyVisibility();
+})();
+</script>
+</body>
+</html>
