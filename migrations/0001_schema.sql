@@ -53,3 +53,9 @@ CREATE TABLE IF NOT EXISTS history (
   after TEXT
 );
 CREATE INDEX IF NOT EXISTS history_entity ON history (entity, entity_id);
+
+-- 편집 비밀번호 로그인 실패 기록 (IP별 시도 제한). Worker가 없으면 스스로 만든다.
+CREATE TABLE IF NOT EXISTS login_failures (
+  ip TEXT NOT NULL,
+  at TEXT NOT NULL
+);

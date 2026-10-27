@@ -1,13 +1,15 @@
 // titan-graph Worker: 그래프 데이터(D1)를 읽고 고치는 /api/* 와 정적 페이지를 함께 서비스한다.
-// 읽기는 누구나, 쓰기는 Cloudflare Access로 로그인한 사용자만 할 수 있다.
+// 읽기는 누구나, 쓰기는 편집 비밀번호로 로그인한 사용자만 할 수 있다.
 
-import { verifyAccessJwt } from "./access.js";
+import { SESSION_SECONDS, createSession, passwordMatches, readSession, sessionCookie } from "./auth.js";
 
 const NOTE_COLORS = ["yellow", "pink", "blue", "green"];
 const NODE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:\/-]{0,199}$/;
 const PROP_PATTERN = /^[A-Za-z][A-Za-z0-9_:.-]{0,99}$/;
 const MAX_NOTE_LENGTH = 2000;
 const MAX_DATA_BYTES = 20000;
+const MAX_LOGIN_FAILURES = 10;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 class HttpError extends Error {
   constructor(status, message) {
@@ -105,6 +107,9 @@ async function route(request, env, url) {
     throw new HttpError(404, "없는 주소입니다.");
   }
 
+  if (method === "POST" && path === "/api/login") return login(request, env);
+  if (method === "POST" && path === "/api/logout") return json({ ok: true }, 200, { "set-cookie": sessionCookie("", 0) });
+
   const actor = await requireEditor(request, env);
   const body = method === "DELETE" ? {} : await readJson(request);
 
@@ -153,22 +158,40 @@ async function readJson(request) {
 // ---------- Auth ----------
 
 async function currentUser(request, env) {
-  if (!env.TEAM_DOMAIN || !env.POLICY_AUD) return null;
-  const token = request.headers.get("cf-access-jwt-assertion");
-  if (!token) return null;
-  const payload = await verifyAccessJwt(token, env.TEAM_DOMAIN, env.POLICY_AUD);
-  return payload ? payload.email || payload.sub || "access-user" : null;
+  if (!env.EDIT_PASSWORD) return null;
+  return readSession(request, env.EDIT_PASSWORD);
 }
 
 async function requireEditor(request, env) {
   const user = await currentUser(request, env);
-  if (!user) throw new HttpError(403, "편집하려면 Cloudflare Access로 로그인해야 합니다.");
+  if (!user) throw new HttpError(403, "편집하려면 먼저 편집 비밀번호로 로그인해야 합니다.");
   return user;
 }
 
 async function me(request, env) {
-  const email = await currentUser(request, env);
-  return { canEdit: !!email, email, accessConfigured: !!(env.TEAM_DOMAIN && env.POLICY_AUD) };
+  const name = await currentUser(request, env);
+  return { canEdit: !!name, name, passwordConfigured: !!env.EDIT_PASSWORD };
+}
+
+// Failed attempts are counted per IP so the password cannot be guessed quickly.
+async function login(request, env) {
+  if (!env.EDIT_PASSWORD) throw new HttpError(503, "편집 비밀번호가 아직 설정되지 않았습니다.");
+  const body = await readJson(request);
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const since = new Date(Date.now() - LOGIN_WINDOW_MS).toISOString();
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS login_failures (ip TEXT NOT NULL, at TEXT NOT NULL)").run();
+  const { n } = await env.DB.prepare("SELECT count(*) AS n FROM login_failures WHERE ip = ? AND at > ?").bind(ip, since).first();
+  if (n >= MAX_LOGIN_FAILURES) throw new HttpError(429, "로그인 시도가 너무 많습니다. 15분 뒤에 다시 해 주세요.");
+  if (!(await passwordMatches(String(body.password || ""), env.EDIT_PASSWORD))) {
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO login_failures (ip, at) VALUES (?, ?)").bind(ip, now()),
+      env.DB.prepare("DELETE FROM login_failures WHERE at <= ?").bind(since),
+    ]);
+    throw new HttpError(401, "비밀번호가 맞지 않습니다.");
+  }
+  const name = String(body.name || "").replace(/[\u0000-\u001f]/g, "").trim().slice(0, 40) || "편집자";
+  const token = await createSession(env.EDIT_PASSWORD, name);
+  return json({ canEdit: true, name }, 200, { "set-cookie": sessionCookie(token, SESSION_SECONDS) });
 }
 
 // ---------- History ----------

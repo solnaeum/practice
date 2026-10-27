@@ -18,6 +18,6 @@
       "migrations_dir": "migrations"
     }
   ],
-  // TEAM_DOMAIN, POLICY_AUD 는 대시보드에서 설정한다. 배포할 때 지워지지 않게 유지한다.
+  // 편집 비밀번호 EDIT_PASSWORD 는 대시보드에서 Secret으로 넣는다. 배포할 때 대시보드 값을 유지한다.
   "keep_vars": true
 }
