@@ -23,7 +23,6 @@
     --g-place: #b8860b;
     --g-species: #c23b6b;
     --g-theme: #1f8fa6;
-    --g-note: #7d8c2b;
     --g-doc: #5b6472;
   }
   @media (prefers-color-scheme: dark) {
@@ -45,7 +44,6 @@
       --g-place: #e0b44a;
       --g-species: #f07aa3;
       --g-theme: #5cc6db;
-      --g-note: #b5c45a;
       --g-doc: #9aa3b2;
     }
   }
@@ -67,7 +65,6 @@
     --g-place: #e0b44a;
     --g-species: #f07aa3;
     --g-theme: #5cc6db;
-    --g-note: #b5c45a;
     --g-doc: #9aa3b2;
   }
   * { box-sizing: border-box; }
@@ -205,7 +202,7 @@
       <g id="queries"></g>
     </svg>
     <div class="overlay" id="legend"><div class="row" id="legendRow"></div>
-      <div class="shapes">● 그래프 노드 · ■ 메모 · ◆ 문서 조각 · ★ 질문</div></div>
+      <div class="shapes">● 그래프 노드 · ◆ 문서 조각 · ★ 질문</div></div>
     <div class="overlay" id="tools">
       <label class="toggle"><input type="checkbox" id="showLabels" checked> 라벨</label>
       <button id="fit" type="button">화면 맞춤</button>
@@ -243,9 +240,9 @@
   const SVGNS = "http://www.w3.org/2000/svg";
   const GROUPS = [
     ["work", "작품"], ["character", "등장인물"], ["person", "실존 인물"], ["org", "조직"], ["place", "장소"],
-    ["species", "종족"], ["theme", "주제"], ["note", "메모"], ["doc", "문서"],
+    ["species", "종족"], ["theme", "주제"], ["doc", "문서"],
   ];
-  const KIND_LABEL = { node: "그래프 노드", note: "메모", doc: "문서 조각" };
+  const KIND_LABEL = { node: "그래프 노드", doc: "문서 조각" };
   const $ = (id) => document.getElementById(id);
   const svg = $("map");
   const layers = { links: $("links"), points: $("points"), rings: $("rings"), queries: $("queries") };
@@ -268,11 +265,10 @@
   }
   const color = (group) => `var(--g-${group})`;
 
-  // A small shape icon for lists and the legend (circle, square or diamond by kind).
+  // A small shape icon for lists and the legend (circle for nodes, diamond for documents).
   function shapeIcon(kind, group) {
     const s = el("svg", { viewBox: "0 0 10 10" });
-    if (kind === "note") el("rect", { x: 1, y: 1, width: 8, height: 8, rx: 1.5, fill: color(group) }, s);
-    else if (kind === "doc") el("path", { d: "M5 0.5 L9.5 5 L5 9.5 L0.5 5 Z", fill: color(group) }, s);
+    if (kind === "doc") el("path", { d: "M5 0.5 L9.5 5 L5 9.5 L0.5 5 Z", fill: color(group) }, s);
     else el("circle", { cx: 5, cy: 5, r: 4.5, fill: color(group) }, s);
     return s;
   }
@@ -311,9 +307,9 @@
     if (!res.ok) return setStatus(data.error || "임베딩을 불러오지 못했습니다.", true);
     items = data.items;
     vectors = data.vectors.map(decode);
-    const counts = { node: 0, note: 0, doc: 0 };
+    const counts = { node: 0, doc: 0 };
     items.forEach((it) => counts[it.kind]++);
-    $("meta").textContent = `${data.model} · ${data.dims}차원 · 노드 ${counts.node} · 메모 ${counts.note} · 문서 조각 ${counts.doc}` +
+    $("meta").textContent = `${data.model} · ${data.dims}차원 · 노드 ${counts.node} · 문서 조각 ${counts.doc}` +
       (data.embedded ? ` · 새로 계산 ${data.embedded}개` : "");
     buildLegend();
     buildPoints();
@@ -464,7 +460,7 @@
     const present = new Set(items.map((it) => it.group));
     for (const [key, label] of GROUPS) {
       if (!present.has(key)) continue;
-      const kind = key === "note" ? "note" : key === "doc" ? "doc" : "node";
+      const kind = key === "doc" ? "doc" : "node";
       const chip = h("button", { type: "button", class: "chip", "aria-pressed": "true", title: "보이기/숨기기" }, shapeIcon(kind, key), label);
       chip.addEventListener("click", () => {
         if (hiddenGroups.has(key)) hiddenGroups.delete(key); else hiddenGroups.add(key);
@@ -481,8 +477,7 @@
     pointEls = items.map((it, i) => {
       const g = el("g", { class: "pt", tabindex: "0", role: "button", "aria-label": `${KIND_LABEL[it.kind]}: ${it.label}` }, layers.points);
       let mark;
-      if (it.kind === "note") mark = el("rect", { x: -5.5, y: -5.5, width: 11, height: 11, rx: 2 }, g);
-      else if (it.kind === "doc") mark = el("path", { d: "M0 -7 L7 0 L0 7 L-7 0 Z" }, g);
+      if (it.kind === "doc") mark = el("path", { d: "M0 -7 L7 0 L0 7 L-7 0 Z" }, g);
       else mark = el("circle", { r: 6 }, g);
       mark.setAttribute("class", "mark");
       mark.setAttribute("fill", color(it.group));
