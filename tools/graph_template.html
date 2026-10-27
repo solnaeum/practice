@@ -263,6 +263,7 @@
     <button id="addNode" type="button" hidden>+ 노드</button>
     <button id="reset" type="button">다시 배치</button>
     <a id="export" href="/api/export.jsonld" hidden><button type="button" tabindex="-1">JSON-LD 내보내기</button></a>
+    <a id="connect" href="/connect" hidden><button type="button" tabindex="-1">AI 연결 (MCP)</button></a>
     <button id="theme" type="button" aria-label="테마 바꾸기">테마</button>
   </div>
 </header>
@@ -680,11 +681,11 @@
     if (loggingIn) return renderLoginForm();
     if (selected) return renderDetail(selected);
     if (creating) return renderCreateForm();
-    panel.replaceChildren(
+    panel.replaceChildren(...[
       h("h2", {}, "노드를 선택하세요"),
       h("p", { className: "hint" }, "노드를 누르면 속성과 연결된 관계가 여기에 나옵니다. 끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다."),
       api.canEdit ? h("p", { className: "hint" }, "편집 모드입니다. 노드를 골라 고치거나, 위의 '+ 노드', '+ 메모'로 새로 추가할 수 있습니다. 메모는 윗부분을 끌어서 옮깁니다.") : null
-    );
+    ].filter(Boolean));
   }
 
   // The literal part of a node (what the database stores in nodes.data).
@@ -1045,16 +1046,29 @@
     box._who.textContent = (target ? target.label + " · " : "") + (note.updated_by || "");
     if (document.activeElement !== box._text) box._text.value = note.text;
   }
+  // A note saved at exactly (0, 0) (e.g. added by an AI tool) has no position yet:
+  // show it above its node, or in a column right of the graph, until someone moves it.
+  function notePos(note) {
+    if (note.x !== 0 || note.y !== 0) return { x: note.x, y: note.y };
+    const target = note.node_id ? nodeByIri.get(expand(note.node_id)) : null;
+    if (target && target.x !== undefined) return { x: target.x + 20, y: target.y - 130 };
+    const vis = nodes.filter(visible);
+    const right = Math.max(...vis.map((n) => n.x + 12 + n.label.length * 11));
+    const top = Math.min(...vis.map((n) => n.y));
+    const i = notes.filter((n) => n.x === 0 && n.y === 0 && !n.node_id).indexOf(note);
+    return { x: right + 30, y: top + i * 120 };
+  }
   function positionNotes() {
     notes.forEach((note) => {
       const box = noteEls.get(note.id);
       if (!box) return;
+      const pos = notePos(note);
       // Notes are part of the canvas: placed in graph units and scaled with the zoom.
-      box.style.transform = `translate(${view.x + note.x * view.s}px, ${view.y + note.y * view.s}px) scale(${view.s})`;
+      box.style.transform = `translate(${view.x + pos.x * view.s}px, ${view.y + pos.y * view.s}px) scale(${view.s})`;
       if (note.link) {
         const target = nodeByIri.get(expand(note.node_id));
         note.link.setAttribute("x1", target.x); note.link.setAttribute("y1", target.y);
-        note.link.setAttribute("x2", note.x + 10 / view.s); note.link.setAttribute("y2", note.y + 10 / view.s);
+        note.link.setAttribute("x2", pos.x + 10 / view.s); note.link.setAttribute("y2", pos.y + 10 / view.s);
       }
     });
   }
@@ -1087,7 +1101,8 @@
   function startNoteDrag(ev, note, box) {
     if (ev.target.closest("button")) return;
     ev.preventDefault();
-    const start = { cx: ev.clientX, cy: ev.clientY, x: note.x, y: note.y };
+    const pos = notePos(note);
+    const start = { cx: ev.clientX, cy: ev.clientY, x: pos.x, y: pos.y };
     box.classList.add("dragging");
     box.setPointerCapture(ev.pointerId);
     const move = (e) => {
@@ -1100,6 +1115,7 @@
       box.removeEventListener("pointermove", move);
       box.removeEventListener("pointerup", up);
       if (note.x !== start.x || note.y !== start.y) saveNote(note, { x: note.x, y: note.y }).catch(() => {});
+      else positionNotes();
     };
     box.addEventListener("pointermove", move);
     box.addEventListener("pointerup", up);
@@ -1208,8 +1224,9 @@
     });
     // Notes are kept in view too (170 x about 100 graph units).
     if (showNotes) notes.forEach((note) => {
-      x0 = Math.min(x0, note.x); y0 = Math.min(y0, note.y);
-      x1 = Math.max(x1, note.x + 170); y1 = Math.max(y1, note.y + 100);
+      const p = notePos(note);
+      x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y);
+      x1 = Math.max(x1, p.x + 170); y1 = Math.max(y1, p.y + 100);
     });
     const pad = 24;
     const s = Math.max(0.25, Math.min(2, Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0))));
@@ -1333,6 +1350,7 @@
     document.getElementById("addNote").hidden = !api.canEdit;
     document.getElementById("addNode").hidden = !api.canEdit;
     document.getElementById("export").hidden = !api.online;
+    document.getElementById("connect").hidden = !api.online;
     document.querySelectorAll('#tabs button[data-tab="trash"], #tabs button[data-tab="history"]').forEach((b) => (b.hidden = !api.canEdit));
     document.getElementById("sourceHint").textContent = api.online
       ? "데이터: Cloudflare D1에 저장된 그래프 (schema.org 기반 JSON-LD로 내보낼 수 있음)."
