@@ -6,6 +6,8 @@ import { mcpRequest } from "./mcp.js";
 import { HttpError } from "./store.js";
 
 export const CHAT_MODEL = "@cf/zai-org/glm-4.7-flash";
+// Shown under each answer so people can see which model replied.
+export const CHAT_MODEL_NAME = "GLM-4.7-Flash";
 const MAX_STEPS = 6;
 const MAX_HISTORY = 12;
 const MAX_MESSAGE_CHARS = 1000;
@@ -108,7 +110,7 @@ export function idsInResult(name, text) {
 /**
  * user is the logged-in editor name or null. Returns an SSE response; events are JSON objects:
  * {type:"tool", name, args} · {type:"tool_result", name, ok, text, ids} · {type:"highlight", ids}
- * {type:"answer", text} · {type:"error", message} · {type:"done", changed, highlight}
+ * {type:"answer", text, model, model_name, tool_calls} · {type:"error", message} · {type:"done", changed, highlight}
  */
 export async function handleChat(request, env, ctx, user, body) {
   if (!env.AI) throw new HttpError(503, "이 서버에는 Workers AI가 연결되어 있지 않습니다.");
@@ -148,13 +150,15 @@ export async function runConversation(env, actor, history, send) {
   ];
   const messages = [{ role: "system", content: systemPrompt(!!actor) }, ...history];
   let changed = false;
+  let toolCallCount = 0;
   const highlight = new Set();
+  const answer = (text) => send({ type: "answer", text, model: CHAT_MODEL, model_name: CHAT_MODEL_NAME, tool_calls: toolCallCount });
 
   for (let step = 0; step < MAX_STEPS; step++) {
     const out = await env.AI.run(CHAT_MODEL, { messages, tools, max_tokens: 1200, temperature: 0.3 });
     const { text, toolCalls } = parseModelOutput(out);
     if (!toolCalls.length) {
-      await send({ type: "answer", text: text || "답을 만들지 못했습니다. 질문을 조금 바꿔 다시 물어봐 주세요." });
+      await answer(text || "답을 만들지 못했습니다. 질문을 조금 바꿔 다시 물어봐 주세요.");
       return send({ type: "done", changed, highlight: [...highlight] });
     }
     messages.push({
@@ -163,6 +167,7 @@ export async function runConversation(env, actor, history, send) {
       tool_calls: toolCalls.map((c) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.args) } })),
     });
     for (const call of toolCalls) {
+      toolCallCount++;
       await send({ type: "tool", name: call.name, args: call.args });
       let resultText;
       let ok = true;
@@ -186,6 +191,6 @@ export async function runConversation(env, actor, history, send) {
       messages.push({ role: "tool", tool_call_id: call.id, name: call.name, content: resultText });
     }
   }
-  await send({ type: "answer", text: "도구를 너무 많이 써서 여기서 멈췄습니다. 질문을 나눠서 다시 물어봐 주세요." });
+  await answer("도구를 너무 많이 써서 여기서 멈췄습니다. 질문을 나눠서 다시 물어봐 주세요.");
   return send({ type: "done", changed, highlight: [...highlight] });
 }

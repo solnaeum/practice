@@ -283,6 +283,7 @@
   .msg ul { margin: 4px 0; padding-left: 18px; }
   .msg code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--panel); padding: 0 4px; border-radius: 3px; }
   .steps { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+  .msg .model { margin-top: 6px; font-size: 11px; color: var(--muted); }
   .steps:empty { display: none; }
   .step { font-size: 12px; color: var(--muted); }
   .step.fail { color: var(--danger); }
@@ -1901,6 +1902,10 @@
             body.className = "";
             body.innerHTML = renderMarkdown(ev.text);
             linkNodeNames(body);
+            if (ev.model_name || ev.model) {
+              const used = ev.tool_calls ? ` · 도구 ${ev.tool_calls}번 사용` : "";
+              bubble.append(h("div", { className: "model", title: ev.model || "" }, `${ev.model_name || ev.model}가 답함${used}`));
+            }
             chatHistory.push({ role: "assistant", content: ev.text });
           } else if (ev.type === "error") {
             answered = true;
