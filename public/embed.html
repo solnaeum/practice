@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>임베딩 지도</title>
+<style>
+  :root {
+    --bg: #f7f6f3;
+    --panel: #ffffff;
+    --text: #1f1f1d;
+    --muted: #6b6a66;
+    --line: #d9d7d0;
+    --soft: #efeee9;
+    --accent: #2f5fd0;
+    --danger: #c0392b;
+    --query: #1f1f1d;
+    --cand: #e8590c;
+    --g-work: #2f5fd0;
+    --g-character: #d0572f;
+    --g-person: #8a5cc8;
+    --g-org: #2f9a6b;
+    --g-place: #b8860b;
+    --g-species: #c23b6b;
+    --g-theme: #1f8fa6;
+    --g-note: #7d8c2b;
+    --g-doc: #5b6472;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #161614;
+      --panel: #201f1d;
+      --text: #ecebe7;
+      --muted: #a3a19a;
+      --line: #3a3935;
+      --soft: #2a2926;
+      --accent: #7ea2ff;
+      --danger: #ff7b6b;
+      --query: #f4f3ef;
+      --cand: #ff922b;
+      --g-work: #7ea2ff;
+      --g-character: #ff8a5c;
+      --g-person: #b896f0;
+      --g-org: #5cc99a;
+      --g-place: #e0b44a;
+      --g-species: #f07aa3;
+      --g-theme: #5cc6db;
+      --g-note: #b5c45a;
+      --g-doc: #9aa3b2;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #161614;
+    --panel: #201f1d;
+    --text: #ecebe7;
+    --muted: #a3a19a;
+    --line: #3a3935;
+    --soft: #2a2926;
+    --accent: #7ea2ff;
+    --danger: #ff7b6b;
+    --query: #f4f3ef;
+    --cand: #ff922b;
+    --g-work: #7ea2ff;
+    --g-character: #ff8a5c;
+    --g-person: #b896f0;
+    --g-org: #5cc99a;
+    --g-place: #e0b44a;
+    --g-species: #f07aa3;
+    --g-theme: #5cc6db;
+    --g-note: #b5c45a;
+    --g-doc: #9aa3b2;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; display: flex; flex-direction: column;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  }
+  button {
+    font: inherit; font-size: 13px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--panel); color: var(--text); cursor: pointer; white-space: nowrap;
+  }
+  button:hover { border-color: var(--muted); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  body > header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px;
+    padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  body > header h1 { font-size: 16px; margin: 0; font-weight: 650; }
+  body > header a { color: var(--accent); text-decoration: none; font-size: 14px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1; }
+  label.toggle { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); cursor: pointer; }
+
+  #layout { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 420px; }
+  #stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
+  #map { width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; user-select: none; }
+  #map.panning { cursor: grabbing; }
+  aside { display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--panel); }
+
+  /* map marks */
+  .pt { cursor: pointer; }
+  .pt .mark { stroke: var(--panel); stroke-width: 1.5; transition: opacity .2s; }
+  .pt text { font-size: 11px; fill: var(--text); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; transition: opacity .2s; }
+  .pt.dim .mark { opacity: .18; }
+  .pt.dim text { opacity: .12; }
+  .pt.hot text { font-weight: 650; }
+  .ring { fill: none; stroke: var(--cand); stroke-width: 2.2; pointer-events: none; }
+  .ring.cited { stroke-width: 3.6; }
+  .ring.focus { stroke: var(--query); stroke-dasharray: 3 2; }
+  .rank { font-size: 10px; font-weight: 700; fill: #fff; pointer-events: none; text-anchor: middle; dominant-baseline: central; }
+  .rank-bg { fill: var(--cand); pointer-events: none; }
+  .link { stroke: var(--cand); fill: none; pointer-events: none; }
+  .link.cited { stroke-dasharray: none; }
+  .link.neighbor { stroke: var(--query); stroke-dasharray: 2 3; }
+  .q-mark { fill: var(--query); stroke: var(--panel); stroke-width: 1.5; cursor: pointer; }
+  .q-mark.old { opacity: .35; }
+  .q-label { font-size: 12px; font-weight: 650; fill: var(--query); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+
+  .overlay { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+  #legend { top: 12px; left: 12px; padding: 8px 10px; font-size: 12px; max-width: calc(100% - 24px); }
+  #legend .row { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+  #legend button.chip { border: 0; padding: 2px 4px; background: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+  #legend button.chip.off { opacity: .35; }
+  #legend svg { width: 11px; height: 11px; }
+  #legend .shapes { margin-top: 4px; color: var(--muted); }
+  #tools { top: 12px; right: 12px; padding: 6px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+  #status { bottom: 12px; right: 12px; padding: 6px 10px; font-size: 12px; color: var(--muted); }
+  #status.error { color: var(--danger); }
+  #detail { bottom: 12px; left: 12px; width: min(380px, calc(100% - 24px)); max-height: 45%; overflow: auto; padding: 10px 12px; font-size: 13px; }
+  #detail h3 { margin: 0 0 2px; font-size: 14px; }
+  #detail pre { white-space: pre-wrap; font: inherit; margin: 6px 0; color: var(--text); }
+  #detail .close { position: absolute; top: 6px; right: 6px; padding: 0 7px; }
+  #detail ol { margin: 4px 0 0; padding-left: 20px; }
+  #detail li { cursor: pointer; }
+  #detail li:hover { text-decoration: underline; }
+  #tip { position: absolute; pointer-events: none; max-width: 300px; padding: 6px 9px; font-size: 12px; z-index: 5; }
+  #tip b { display: block; }
+
+  /* chat */
+  aside > header { padding: 10px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; }
+  aside h2 { margin: 0; font-size: 15px; }
+  aside .sub { font-size: 12px; color: var(--muted); }
+  #log { flex: 1; overflow-y: auto; padding: 12px 14px; display: flex; flex-direction: column; gap: 12px; }
+  .msg-user { align-self: flex-end; background: var(--accent); color: #fff; padding: 7px 11px; border-radius: 12px 12px 2px 12px; max-width: 88%; white-space: pre-wrap; }
+  .turn { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+  .turn.active { border-color: var(--cand); box-shadow: 0 0 0 1px var(--cand); }
+  .turn h4 { margin: 0 0 6px; font-size: 12px; color: var(--muted); font-weight: 600; display: flex; gap: 6px; align-items: center; }
+  .answer { white-space: pre-wrap; margin: 8px 0 0; }
+  .answer.error { color: var(--danger); }
+  .cite { display: inline-block; min-width: 18px; padding: 0 4px; margin: 0 1px; border-radius: 9px; background: var(--cand); color: #fff; font-size: 11px; font-weight: 700; text-align: center; line-height: 17px; cursor: pointer; }
+  .cands { display: grid; grid-template-columns: 18px minmax(0, 1fr) 92px; gap: 3px 8px; align-items: center; font-size: 12px; }
+  .cands .r { font-weight: 700; color: var(--cand); text-align: right; }
+  .cands .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+  .cands .name svg { flex: none; width: 10px; height: 10px; }
+  .cands .bar { position: relative; height: 14px; background: var(--soft); border-radius: 3px; }
+  .cands .bar span { position: absolute; inset: 0 auto 0 0; background: var(--cand); border-radius: 3px; opacity: .75; }
+  .cands .bar em { position: absolute; right: 4px; top: 0; font-style: normal; font-size: 10.5px; line-height: 14px; color: var(--text); }
+  .cands .row { display: contents; }
+  .cands .row:hover .name { text-decoration: underline; }
+  .cands .row.cited .r::after { content: "✓"; margin-left: 1px; }
+  .pill { font-size: 10.5px; padding: 0 5px; border-radius: 8px; border: 1px solid var(--cand); color: var(--cand); }
+  .hist { width: 100%; height: 46px; display: block; margin-top: 8px; }
+  .hist rect { fill: var(--line); }
+  .hist rect.in { fill: var(--cand); }
+  .hist line { stroke: var(--text); stroke-dasharray: 2 2; }
+  .hist text { font-size: 9.5px; fill: var(--muted); }
+  .spinner { display: inline-block; width: 10px; height: 10px; border: 2px solid var(--line); border-top-color: var(--cand); border-radius: 50%; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #examples { display: flex; flex-wrap: wrap; gap: 6px; }
+  #examples button { font-size: 12px; border-radius: 14px; }
+  form { display: flex; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--line); }
+  textarea { flex: 1; resize: none; font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); max-height: 120px; }
+  #notice { margin: 0; padding: 0 14px 6px; font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    body { height: auto; }
+    #layout { grid-template-columns: 1fr; }
+    #stage { height: 62vh; min-height: 360px; }
+    aside { border-left: 0; border-top: 1px solid var(--line); min-height: 70vh; }
+    #detail { max-height: 55%; }
+    #tools { top: auto; bottom: 46px; }
+    #legend .shapes { display: none; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>임베딩 지도</h1>
+  <span class="muted" id="meta">불러오는 중</span>
+  <span class="spacer"></span>
+  <a href="/">그래프</a>
+  <a href="/connect">AI 연결 (MCP)</a>
+  <button id="theme" type="button" aria-label="테마 바꾸기">테마</button>
+</header>
+<div id="layout">
+  <div id="stage">
+    <svg id="map" role="img" aria-label="임베딩 2차원 지도">
+      <g id="links"></g>
+      <g id="points"></g>
+      <g id="rings"></g>
+      <g id="queries"></g>
+    </svg>
+    <div class="overlay" id="legend"><div class="row" id="legendRow"></div>
+      <div class="shapes">● 그래프 노드 · ■ 메모 · ◆ 문서 조각 · ★ 질문</div></div>
+    <div class="overlay" id="tools">
+      <label class="toggle"><input type="checkbox" id="showLabels" checked> 라벨</label>
+      <button id="fit" type="button">화면 맞춤</button>
+      <button id="relayout" type="button">다시 배치</button>
+    </div>
+    <div class="overlay" id="status">임베딩을 불러오는 중…</div>
+    <div class="overlay" id="detail" hidden></div>
+    <div class="overlay" id="tip" hidden></div>
+  </div>
+  <aside>
+    <header>
+      <div><h2>데이터에 질문하기</h2><div class="sub" id="chatSub">질문을 임베딩해 지도에 ★로 놓고, 가까운 후보를 골라 답합니다</div></div>
+      <span class="spacer"></span>
+      <button id="clear" type="button" title="새 대화">새 대화</button>
+    </header>
+    <div id="log" aria-live="polite">
+      <div class="muted">예시 질문</div>
+      <div id="examples">
+        <button type="button">거인이 나오는 이야기를 비교해 줘</button>
+        <button type="button">에렌 예거는 어떤 인물이야?</button>
+        <button type="button">브롭딩낵 왕은 걸리버에게 뭐라고 했어?</button>
+        <button type="button">진격의 거인 성우는 누구야?</button>
+      </div>
+    </div>
+    <p id="notice"></p>
+    <form id="form">
+      <textarea id="input" rows="1" maxlength="1000" placeholder="데이터에 대해 물어보세요" aria-label="질문"></textarea>
+      <button class="primary" id="send" type="submit">보내기</button>
+    </form>
+  </aside>
+</div>
+<script>
+(() => {
+  "use strict";
+  const SVGNS = "http://www.w3.org/2000/svg";
+  const GROUPS = [
+    ["work", "작품"], ["character", "등장인물"], ["person", "실존 인물"], ["org", "조직"], ["place", "장소"],
+    ["species", "종족"], ["theme", "주제"], ["note", "메모"], ["doc", "문서"],
+  ];
+  const KIND_LABEL = { node: "그래프 노드", note: "메모", doc: "문서 조각" };
+  const $ = (id) => document.getElementById(id);
+  const svg = $("map");
+  const layers = { links: $("links"), points: $("points"), rings: $("rings"), queries: $("queries") };
+
+  function el(tag, attrs = {}, parent) {
+    const node = document.createElementNS(SVGNS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    if (parent) parent.appendChild(node);
+    return node;
+  }
+  function h(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k === "class") node.className = v;
+      else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+      else node.setAttribute(k, v);
+    }
+    for (const c of children.flat()) if (c != null) node.append(c);
+    return node;
+  }
+  const color = (group) => `var(--g-${group})`;
+
+  // A small shape icon for lists and the legend (circle, square or diamond by kind).
+  function shapeIcon(kind, group) {
+    const s = el("svg", { viewBox: "0 0 10 10" });
+    if (kind === "note") el("rect", { x: 1, y: 1, width: 8, height: 8, rx: 1.5, fill: color(group) }, s);
+    else if (kind === "doc") el("path", { d: "M5 0.5 L9.5 5 L5 9.5 L0.5 5 Z", fill: color(group) }, s);
+    else el("circle", { cx: 5, cy: 5, r: 4.5, fill: color(group) }, s);
+    return s;
+  }
+
+  // ---------- State ----------
+  let items = [], vectors = [], Y = null;           // Y: layout coordinates [x, y] per item
+  let view = { k: 1, x: 0, y: 0 };                   // zoom/pan on top of the fitted layout
+  let fit = { s: 1, cx: 0, cy: 0 };                  // layout -> screen fit
+  const hiddenGroups = new Set();
+  const turns = [];                                  // {question, scores, candidates, cited, answer, pos, el}
+  let activeTurn = null, focusIndex = null, hoverIndex = null;
+  let pointEls = [];
+  let busy = false;
+
+  // ---------- Data ----------
+  function decode(b64) {
+    const bin = atob(b64);
+    const v = new Float32Array(bin.length);
+    let n = 0;
+    for (let i = 0; i < bin.length; i++) { const b = bin.charCodeAt(i); v[i] = b > 127 ? b - 256 : b; n += v[i] * v[i]; }
+    n = Math.sqrt(n) || 1;
+    for (let i = 0; i < v.length; i++) v[i] /= n;
+    return v;
+  }
+  const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+
+  async function load() {
+    setStatus("임베딩을 불러오는 중… (처음이면 계산하느라 몇 초 걸립니다)");
+    let res;
+    try {
+      res = await fetch("/api/embeddings", { headers: { accept: "application/json" } });
+    } catch {
+      return setStatus("서버에 연결하지 못했습니다. 이 페이지는 배포된 Worker에서 열어야 합니다.", true);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) return setStatus(data.error || "임베딩을 불러오지 못했습니다.", true);
+    items = data.items;
+    vectors = data.vectors.map(decode);
+    const counts = { node: 0, note: 0, doc: 0 };
+    items.forEach((it) => counts[it.kind]++);
+    $("meta").textContent = `${data.model} · ${data.dims}차원 · 노드 ${counts.node} · 메모 ${counts.note} · 문서 조각 ${counts.doc}` +
+      (data.embedded ? ` · 새로 계산 ${data.embedded}개` : "");
+    buildLegend();
+    buildPoints();
+    runLayout();
+  }
+
+  // ---------- t-SNE (exact, fine for a few hundred points) ----------
+  function rng(seed) {
+    return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+
+  // Start from the top two principal components (power iteration on the centered Gram matrix) so the layout is stable.
+  function pcaInit(S, n) {
+    const G = S.map((row) => row.slice());
+    const rowMean = G.map((r) => r.reduce((a, b) => a + b, 0) / n);
+    const all = rowMean.reduce((a, b) => a + b, 0) / n;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) G[i][j] = G[i][j] - rowMean[i] - rowMean[j] + all;
+    const rand = rng(7);
+    const comps = [];
+    for (let c = 0; c < 2; c++) {
+      let v = Array.from({ length: n }, () => rand() - 0.5);
+      let lambda = 0;
+      for (let it = 0; it < 100; it++) {
+        const w = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) { let s = 0; for (let j = 0; j < n; j++) s += G[i][j] * v[j]; w[i] = s; }
+        for (const p of comps) { const d = w.reduce((a, x, i) => a + x * p.v[i], 0); for (let i = 0; i < n; i++) w[i] -= d * p.v[i]; }
+        lambda = Math.sqrt(w.reduce((a, x) => a + x * x, 0)) || 1;
+        v = w.map((x) => x / lambda);
+      }
+      comps.push({ v, lambda });
+    }
+    const out = [];
+    for (let i = 0; i < n; i++) out.push([comps[0].v[i], comps[1].v[i]]);
+    const sd = Math.sqrt(out.reduce((a, p) => a + p[0] * p[0], 0) / n) || 1;
+    return out.map((p) => [p[0] / sd * 1e-2, p[1] / sd * 1e-2]);
+  }
+
+  function affinities(D, n, perplexity) {
+    const P = Array.from({ length: n }, () => new Float64Array(n));
+    const target = Math.log(perplexity);
+    for (let i = 0; i < n; i++) {
+      let beta = 1, lo = -Infinity, hi = Infinity;
+      for (let t = 0; t < 60; t++) {
+        let sum = 0, hsum = 0;
+        for (let j = 0; j < n; j++) { if (j === i) continue; const p = Math.exp(-D[i][j] * beta); P[i][j] = p; sum += p; hsum += D[i][j] * p; }
+        sum = sum || 1e-12;
+        const H = Math.log(sum) + beta * hsum / sum;
+        for (let j = 0; j < n; j++) P[i][j] /= sum;
+        const diff = H - target;
+        if (Math.abs(diff) < 1e-5) break;
+        if (diff > 0) { lo = beta; beta = hi === Infinity ? beta * 2 : (beta + hi) / 2; }
+        else { hi = beta; beta = lo === -Infinity ? beta / 2 : (beta + lo) / 2; }
+      }
+    }
+    const Q = Array.from({ length: n }, () => new Float64Array(n));
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) Q[i][j] = Math.max((P[i][j] + P[j][i]) / (2 * n), 1e-12);
+    return Q;
+  }
+
+  let layoutRun = 0;
+  function runLayout() {
+    const run = ++layoutRun;
+    const n = items.length;
+    if (n < 3) { Y = items.map((_, i) => [i, 0]); fitToView(); render(); return; }
+    const S = vectors.map((a) => vectors.map((b) => dot(a, b)));
+    const D = S.map((row) => row.map((s) => Math.max(0, 2 - 2 * s)));
+    const P = affinities(D, n, Math.min(12, (n - 1) / 3));
+    Y = pcaInit(S, n);
+    const gains = Y.map(() => [1, 1]), vel = Y.map(() => [0, 0]);
+    const ITER = 700, lr = Math.max(n / 4, 50);
+    let iter = 0;
+    const step = () => {
+      if (run !== layoutRun) return;
+      for (let s = 0; s < 15 && iter < ITER; s++, iter++) {
+        const exag = iter < 120 ? 8 : 1, mom = iter < 120 ? 0.5 : 0.8;
+        const num = Array.from({ length: n }, () => new Float64Array(n));
+        let qsum = 0;
+        for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+          const dx = Y[i][0] - Y[j][0], dy = Y[i][1] - Y[j][1];
+          const q = 1 / (1 + dx * dx + dy * dy);
+          num[i][j] = num[j][i] = q; qsum += 2 * q;
+        }
+        for (let i = 0; i < n; i++) {
+          let gx = 0, gy = 0;
+          for (let j = 0; j < n; j++) {
+            if (i === j) continue;
+            const m = 4 * (exag * P[i][j] - num[i][j] / qsum) * num[i][j];
+            gx += m * (Y[i][0] - Y[j][0]); gy += m * (Y[i][1] - Y[j][1]);
+          }
+          const g = [gx, gy];
+          for (let d = 0; d < 2; d++) {
+            gains[i][d] = Math.sign(g[d]) === Math.sign(vel[i][d]) ? gains[i][d] * 0.8 : gains[i][d] + 0.2;
+            gains[i][d] = Math.max(gains[i][d], 0.01);
+            vel[i][d] = mom * vel[i][d] - lr * gains[i][d] * g[d];
+          }
+        }
+        for (let i = 0; i < n; i++) { Y[i][0] += vel[i][0]; Y[i][1] += vel[i][1]; }
+      }
+      fitToView();
+      turns.forEach(placeQuery);
+      render();
+      if (iter < ITER) {
+        setStatus(`t-SNE로 2차원 배치 중… ${Math.round(iter / ITER * 100)}%`);
+        requestAnimationFrame(step);
+      } else {
+        setStatus(`${n}개 항목 · 가까울수록 의미가 비슷합니다 (t-SNE, 코사인 유사도)`);
+      }
+    };
+    requestAnimationFrame(step);
+  }
+
+  // ---------- Placement & view ----------
+  function fitToView() {
+    if (!Y || !Y.length) return;
+    const { width, height } = svg.getBoundingClientRect();
+    const xs = Y.map((p) => p[0]), ys = Y.map((p) => p[1]);
+    const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+    const padTop = 70, pad = 40;
+    const s = Math.min((width - pad * 2) / ((maxX - minX) || 1), (height - padTop - pad) / ((maxY - minY) || 1));
+    fit = { s, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, w: width, h: height, oy: (padTop - pad) / 2 };
+  }
+  function toScreen(p) {
+    const x = (p[0] - fit.cx) * fit.s + fit.w / 2, y = (p[1] - fit.cy) * fit.s + fit.h / 2 + fit.oy;
+    return [x * view.k + view.x, y * view.k + view.y];
+  }
+
+  // The question is not part of the t-SNE layout; it is placed at the similarity-weighted centre of its nearest candidates.
+  function placeQuery(turn) {
+    if (!Y || !turn.candidates) return;
+    const top = turn.candidates.slice(0, 5);
+    const best = top[0].score;
+    let wx = 0, wy = 0, ws = 0;
+    for (const c of top) {
+      const i = indexOf(c.id);
+      if (i < 0) continue;
+      const w = Math.exp((c.score - best) / 0.03);
+      wx += w * Y[i][0]; wy += w * Y[i][1]; ws += w;
+    }
+    turn.pos = ws ? [wx / ws, wy / ws] : null;
+  }
+  const idIndex = new Map();
+  const indexOf = (id) => { if (!idIndex.size) items.forEach((it, i) => idIndex.set(it.id, i)); return idIndex.has(id) ? idIndex.get(id) : -1; };
+
+  // ---------- Rendering ----------
+  function buildLegend() {
+    const row = $("legendRow");
+    row.replaceChildren();
+    const present = new Set(items.map((it) => it.group));
+    for (const [key, label] of GROUPS) {
+      if (!present.has(key)) continue;
+      const kind = key === "note" ? "note" : key === "doc" ? "doc" : "node";
+      const chip = h("button", { type: "button", class: "chip", "aria-pressed": "true", title: "보이기/숨기기" }, shapeIcon(kind, key), label);
+      chip.addEventListener("click", () => {
+        if (hiddenGroups.has(key)) hiddenGroups.delete(key); else hiddenGroups.add(key);
+        chip.classList.toggle("off", hiddenGroups.has(key));
+        chip.setAttribute("aria-pressed", String(!hiddenGroups.has(key)));
+        render();
+      });
+      row.append(chip);
+    }
+  }
+
+  function buildPoints() {
+    layers.points.replaceChildren();
+    pointEls = items.map((it, i) => {
+      const g = el("g", { class: "pt", tabindex: "0", role: "button", "aria-label": `${KIND_LABEL[it.kind]}: ${it.label}` }, layers.points);
+      let mark;
+      if (it.kind === "note") mark = el("rect", { x: -5.5, y: -5.5, width: 11, height: 11, rx: 2 }, g);
+      else if (it.kind === "doc") mark = el("path", { d: "M0 -7 L7 0 L0 7 L-7 0 Z" }, g);
+      else mark = el("circle", { r: 6 }, g);
+      mark.setAttribute("class", "mark");
+      mark.setAttribute("fill", color(it.group));
+      const label = el("text", { x: 9, y: 4 }, g);
+      label.textContent = it.label.length > 22 ? it.label.slice(0, 21) + "…" : it.label;
+      g.addEventListener("pointerenter", (e) => { hoverIndex = i; showTip(i, e); render(); });
+      g.addEventListener("pointermove", (e) => moveTip(e));
+      g.addEventListener("pointerleave", () => { hoverIndex = null; $("tip").hidden = true; render(); });
+      g.addEventListener("click", (e) => { e.stopPropagation(); selectPoint(i); });
+      g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectPoint(i); } });
+      return { g, label };
+    });
+  }
+
+  function neighborsOf(i, k = 6) {
+    return vectors.map((v, j) => ({ j, s: j === i ? -2 : dot(vectors[i], v) })).sort((a, b) => b.s - a.s).slice(0, k);
+  }
+
+  function render() {
+    if (!Y) return;
+    const turn = activeTurn;
+    const showLabels = $("showLabels").checked;
+    const cand = new Map((turn?.candidates || []).map((c) => [indexOf(c.id), c]));
+    const cited = new Set((turn?.cited || []).map(indexOf));
+    const neighbors = focusIndex != null ? new Map(neighborsOf(focusIndex).map((n) => [n.j, n.s])) : new Map();
+    let scoreMin = 0, scoreMax = 1;
+    if (turn?.scores) { scoreMin = Math.min(...turn.scores); scoreMax = Math.max(...turn.scores); }
+
+    items.forEach((it, i) => {
+      const { g, label } = pointEls[i];
+      const hidden = hiddenGroups.has(it.group);
+      g.style.display = hidden ? "none" : "";
+      if (hidden) return;
+      const [x, y] = toScreen(Y[i]);
+      g.setAttribute("transform", `translate(${x.toFixed(1)},${y.toFixed(1)})`);
+      const isHot = cand.has(i) || neighbors.has(i) || i === focusIndex || i === hoverIndex;
+      let dim = false;
+      if (focusIndex != null) dim = !isHot;
+      else if (turn?.scores) {
+        // Fade by similarity to the active question so the relevant region stands out.
+        const t = (turn.scores[i] - scoreMin) / ((scoreMax - scoreMin) || 1);
+        g.querySelector(".mark").style.opacity = isHot ? 1 : (0.15 + 0.6 * t * t).toFixed(2);
+      }
+      if (!turn?.scores || focusIndex != null) g.querySelector(".mark").style.opacity = "";
+      g.classList.toggle("dim", dim);
+      g.classList.toggle("hot", isHot);
+      label.style.display = showLabels || isHot ? "" : "none";
+      if (turn?.scores && !isHot && focusIndex == null) label.style.opacity = (turn.scores[i] - scoreMin) / ((scoreMax - scoreMin) || 1) > 0.7 ? "" : "0.25";
+      else label.style.opacity = "";
+    });
+
+    layers.links.replaceChildren();
+    layers.rings.replaceChildren();
+    layers.queries.replaceChildren();
+
+    if (focusIndex != null && !hiddenGroups.has(items[focusIndex].group)) {
+      const [fx, fy] = toScreen(Y[focusIndex]);
+      for (const [j] of neighbors) {
+        if (hiddenGroups.has(items[j].group)) continue;
+        const [x, y] = toScreen(Y[j]);
+        el("line", { class: "link neighbor", x1: fx, y1: fy, x2: x, y2: y, "stroke-width": 1.4 }, layers.links);
+      }
+      el("circle", { class: "ring focus", cx: fx, cy: fy, r: 11 }, layers.rings);
+    }
+
+    // Previous questions stay on the map as faint stars; the active one shows lines to its candidates.
+    for (const t of turns) {
+      if (!t.pos) continue;
+      const [qx, qy] = toScreen(t.pos);
+      const active = t === turn;
+      if (active && focusIndex == null) {
+        const best = t.candidates[0].score, worst = t.candidates[t.candidates.length - 1].score;
+        for (const c of t.candidates) {
+          const i = indexOf(c.id);
+          if (i < 0 || hiddenGroups.has(items[i].group)) continue;
+          const [x, y] = toScreen(Y[i]);
+          const strength = (c.score - worst) / ((best - worst) || 1);
+          el("line", {
+            class: `link${cited.has(i) ? " cited" : ""}`, x1: qx, y1: qy, x2: x, y2: y,
+            "stroke-width": (1 + strength * 2.5).toFixed(2), "stroke-opacity": (0.35 + strength * 0.55).toFixed(2),
+            "stroke-dasharray": cited.has(i) ? "" : "4 3",
+          }, layers.links);
+          el("circle", { class: `ring${cited.has(i) ? " cited" : ""}`, cx: x, cy: y, r: cited.has(i) ? 11 : 10 }, layers.rings);
+          el("circle", { class: "rank-bg", cx: x + 9, cy: y - 9, r: 7 }, layers.rings);
+          el("text", { class: "rank", x: x + 9, y: y - 9 }, layers.rings).textContent = c.rank;
+        }
+      }
+      const star = el("path", { class: `q-mark${active ? "" : " old"}`, d: starPath(qx, qy, active ? 11 : 7), tabindex: "0", role: "button", "aria-label": `질문: ${t.question}` }, layers.queries);
+      const title = el("title", {}, star);
+      title.textContent = t.question;
+      star.addEventListener("click", (e) => { e.stopPropagation(); selectTurn(t); });
+      if (active) {
+        const q = el("text", { class: "q-label", x: qx + 14, y: qy - 10 }, layers.queries);
+        q.textContent = t.question.length > 26 ? t.question.slice(0, 25) + "…" : t.question;
+      }
+    }
+  }
+
+  function starPath(cx, cy, r) {
+    let d = "";
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+      d += `${i ? "L" : "M"}${(cx + rr * Math.cos(a)).toFixed(1)} ${(cy + rr * Math.sin(a)).toFixed(1)} `;
+    }
+    return d + "Z";
+  }
+
+  // ---------- Tooltip & detail ----------
+  function showTip(i, e) {
+    const it = items[i];
+    const tip = $("tip");
+    tip.replaceChildren(h("b", {}, it.label), h("span", { class: "muted" }, KIND_LABEL[it.kind]),
+      activeTurn?.scores ? h("span", { class: "muted" }, ` · 질문과의 유사도 ${activeTurn.scores[i].toFixed(3)}`) : null,
+      h("div", {}, it.text.length > 180 ? it.text.slice(0, 179) + "…" : it.text));
+    tip.hidden = false;
+    moveTip(e);
+  }
+  function moveTip(e) {
+    const tip = $("tip"), box = $("stage").getBoundingClientRect();
+    let x = e.clientX - box.left + 14, y = e.clientY - box.top + 14;
+    if (x + tip.offsetWidth > box.width - 8) x = e.clientX - box.left - tip.offsetWidth - 14;
+    if (y + tip.offsetHeight > box.height - 8) y = e.clientY - box.top - tip.offsetHeight - 14;
+    tip.style.left = `${Math.max(4, x)}px`;
+    tip.style.top = `${Math.max(4, y)}px`;
+  }
+
+  function selectPoint(i) {
+    focusIndex = i;
+    const it = items[i];
+    const box = $("detail");
+    const close = h("button", { type: "button", class: "close", "aria-label": "닫기" }, "×");
+    close.addEventListener("click", (e) => { e.stopPropagation(); clearFocus(); });
+    const list = h("ol", {}, neighborsOf(i).map((n) => {
+      const li = h("li", {}, `${items[n.j].label} `, h("span", { class: "muted" }, `${KIND_LABEL[items[n.j].kind]} · ${n.s.toFixed(3)}`));
+      li.addEventListener("click", () => selectPoint(n.j));
+      return li;
+    }));
+    box.replaceChildren(close, h("h3", {}, it.label),
+      h("div", { class: "muted" }, KIND_LABEL[it.kind], it.nodeId ? ` · ${it.nodeId}` : "", it.source ? ` · ${it.source}` : "",
+        activeTurn?.scores ? ` · 질문과의 유사도 ${activeTurn.scores[i].toFixed(3)}` : ""),
+      h("pre", {}, it.text), h("div", { class: "muted" }, "의미가 가장 가까운 항목"), list);
+    box.hidden = false;
+    render();
+  }
+  function clearFocus() { focusIndex = null; $("detail").hidden = true; render(); }
+
+  // ---------- Zoom & pan ----------
+  const pointers = new Map();
+  let pinch = null;
+  svg.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    zoomAt(e.offsetX, e.offsetY, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+  function zoomAt(x, y, factor) {
+    const k = Math.min(12, Math.max(0.3, view.k * factor));
+    view.x = x - (x - view.x) * (k / view.k);
+    view.y = y - (y - view.y) * (k / view.k);
+    view.k = k;
+    render();
+  }
+  svg.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".pt, .q-mark")) return;
+    svg.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.offsetX, y: e.offsetY, sx: e.offsetX, sy: e.offsetY });
+    svg.classList.add("panning");
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: view.k };
+    }
+  });
+  svg.addEventListener("pointermove", (e) => {
+    const p = pointers.get(e.pointerId);
+    if (!p) return;
+    const dx = e.offsetX - p.x, dy = e.offsetY - p.y;
+    p.x = e.offsetX; p.y = e.offsetY;
+    if (pointers.size === 2 && pinch) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, (pinch.k * d / pinch.d) / view.k);
+    } else {
+      view.x += dx; view.y += dy;
+      render();
+    }
+  });
+  const endPointer = (e) => {
+    const p = pointers.get(e.pointerId);
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (!pointers.size) svg.classList.remove("panning");
+    // A click on empty space (no drag) clears the selected point.
+    if (p && e.type === "pointerup" && Math.hypot(e.offsetX - p.sx, e.offsetY - p.sy) < 4 && focusIndex != null) clearFocus();
+  };
+  svg.addEventListener("pointerup", endPointer);
+  svg.addEventListener("pointercancel", endPointer);
+  $("fit").addEventListener("click", () => { view = { k: 1, x: 0, y: 0 }; fitToView(); render(); });
+  $("relayout").addEventListener("click", () => { if (items.length) { view = { k: 1, x: 0, y: 0 }; runLayout(); } });
+  $("showLabels").addEventListener("change", render);
+  addEventListener("resize", () => { fitToView(); render(); });
+  $("theme").addEventListener("click", () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+  });
+
+  function setStatus(text, error = false) {
+    const s = $("status");
+    s.textContent = text;
+    s.classList.toggle("error", error);
+  }
+
+  // ---------- Chat ----------
+  const log = $("log"), input = $("input");
+  input.addEventListener("input", () => { input.style.height = "auto"; input.style.height = `${input.scrollHeight}px`; });
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("form").requestSubmit(); } });
+  $("form").addEventListener("submit", (e) => { e.preventDefault(); ask(input.value); });
+  $("examples").addEventListener("click", (e) => { if (e.target.closest("button")) ask(e.target.closest("button").textContent); });
+  $("clear").addEventListener("click", () => {
+    if (busy) return;
+    turns.length = 0;
+    activeTurn = null;
+    log.querySelectorAll(".msg-user, .turn").forEach((n) => n.remove());
+    $("examples").hidden = false;
+    log.firstElementChild.hidden = false;
+    clearFocus();
+  });
+
+  function selectTurn(t) {
+    activeTurn = t;
+    turns.forEach((x) => x.el.classList.toggle("active", x === t));
+    focusIndex = null;
+    $("detail").hidden = true;
+    render();
+  }
+
+  function history() {
+    const msgs = [];
+    for (const t of turns) {
+      msgs.push({ role: "user", content: t.question });
+      if (t.answer) msgs.push({ role: "assistant", content: t.answer });
+    }
+    return msgs;
+  }
+
+  async function ask(text) {
+    text = text.trim();
+    if (!text || busy || !items.length) {
+      if (!items.length) $("notice").textContent = "임베딩을 다 불러온 뒤에 질문할 수 있습니다.";
+      return;
+    }
+    busy = true;
+    $("send").disabled = true;
+    $("notice").textContent = "";
+    input.value = "";
+    input.style.height = "auto";
+    $("examples").hidden = true;
+    log.firstElementChild.hidden = true;
+
+    const turn = { question: text, scores: null, candidates: null, cited: [], answer: "" };
+    const head = h("h4", {}, h("span", { class: "spinner" }), "질문 임베딩 중…");
+    const body = h("div");
+    turn.el = h("div", { class: "turn" }, head, body);
+    turn.el.addEventListener("click", (e) => { if (!e.target.closest(".row, .cite")) selectTurn(turn); });
+    log.append(h("div", { class: "msg-user" }, text), turn.el);
+    log.scrollTop = log.scrollHeight;
+    const messages = [...history(), { role: "user", content: text }];
+    turns.push(turn);
+
+    try {
+      const res = await fetch("/api/embed-chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages }) });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "질문을 보내지 못했습니다.");
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let cut;
+        while ((cut = buf.indexOf("\n\n")) >= 0) {
+          const chunk = buf.slice(0, cut);
+          buf = buf.slice(cut + 2);
+          const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+          if (line) onEvent(turn, head, body, JSON.parse(line.slice(6)));
+        }
+      }
+    } catch (err) {
+      head.replaceChildren("오류");
+      body.append(h("p", { class: "answer error" }, err.message || "오류가 났습니다."));
+      if (!turn.candidates) { turns.splice(turns.indexOf(turn), 1); }
+    } finally {
+      busy = false;
+      $("send").disabled = false;
+      if (head.querySelector(".spinner")) head.querySelector(".spinner").remove();
+      log.scrollTop = log.scrollHeight;
+    }
+  }
+
+  function onEvent(turn, head, body, ev) {
+    if (ev.type === "query") {
+      turn.scores = ev.scores;
+    } else if (ev.type === "candidates") {
+      turn.candidates = ev.items;
+      placeQuery(turn);
+      head.replaceChildren(h("span", { class: "spinner" }), `후보 ${ev.items.length}개 · 답변 만드는 중…`);
+      body.append(candidateList(turn), histogram(turn));
+      selectTurn(turn);
+    } else if (ev.type === "answer") {
+      turn.answer = ev.text;
+      turn.cited = ev.cited || [];
+      head.replaceChildren(`후보 ${turn.candidates?.length || 0}개 중 ${turn.cited.length}개 인용`, turn.cited.length ? h("span", { class: "pill" }, "✓ 인용") : null);
+      body.querySelectorAll(".cands .row").forEach((row) => row.classList.toggle("cited", turn.cited.includes(row.dataset.id)));
+      body.append(answerView(turn));
+      if (activeTurn === turn) render();
+    } else if (ev.type === "error") {
+      head.replaceChildren("오류");
+      body.append(h("p", { class: "answer error" }, ev.message));
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function candidateList(turn) {
+    // Bars start at the median similarity of all items, so they show how far each candidate stands out.
+    const best = turn.candidates[0].score;
+    const sorted = [...turn.scores].sort((a, b) => a - b);
+    const floor = Math.min(sorted[Math.floor(sorted.length / 2)], turn.candidates[turn.candidates.length - 1].score - 0.01);
+    const box = h("div", { class: "cands" });
+    for (const c of turn.candidates) {
+      const i = indexOf(c.id);
+      const it = items[i] || { label: c.id, kind: "node", group: "work" };
+      const pct = ((c.score - floor) / ((best - floor) || 1)) * 100;
+      const row = h("div", { class: "row", "data-id": c.id },
+        h("span", { class: "r" }, String(c.rank)),
+        h("span", { class: "name", title: `${KIND_LABEL[it.kind]} · ${it.label}` }, shapeIcon(it.kind, it.group), it.label),
+        h("span", { class: "bar" }, h("span", { style: `width:${Math.max(4, pct).toFixed(1)}%` }), h("em", {}, c.score.toFixed(3))));
+      for (const cell of row.children) {
+        cell.addEventListener("pointerenter", () => { if (activeTurn === turn && i >= 0) { hoverIndex = i; render(); } });
+        cell.addEventListener("pointerleave", () => { hoverIndex = null; render(); });
+        cell.addEventListener("click", () => { if (activeTurn !== turn) selectTurn(turn); if (i >= 0) selectPoint(i); });
+        cell.style.cursor = "pointer";
+      }
+      box.append(row);
+    }
+    return box;
+  }
+
+  // Distribution of similarity over every item; the shaded bins hold the chosen candidates.
+  function histogram(turn) {
+    const BINS = 24, W = 360, H = 46, base = 34;
+    const lo = Math.min(...turn.scores), hi = Math.max(...turn.scores);
+    const cut = turn.candidates[turn.candidates.length - 1].score;
+    const bins = new Array(BINS).fill(0), inBins = new Array(BINS).fill(0);
+    turn.scores.forEach((s) => {
+      const b = Math.min(BINS - 1, Math.floor((s - lo) / ((hi - lo) || 1) * BINS));
+      bins[b]++;
+      if (s >= cut) inBins[b]++;
+    });
+    const max = Math.max(...bins);
+    const s = el("svg", { class: "hist", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", role: "img", "aria-label": "전체 항목의 유사도 분포" });
+    const bw = W / BINS;
+    bins.forEach((n, b) => {
+      if (!n) return;
+      const bh = (n / max) * (base - 4);
+      el("rect", { x: b * bw + 1, y: base - bh, width: bw - 2, height: bh, class: inBins[b] ? "in" : "" }, s);
+    });
+    const cx = ((cut - lo) / ((hi - lo) || 1)) * W;
+    el("line", { x1: cx, x2: cx, y1: 0, y2: base }, s);
+    el("text", { x: 0, y: H - 2 }, s).textContent = `유사도 ${lo.toFixed(2)}`;
+    const t = el("text", { x: W, y: H - 2, "text-anchor": "end" }, s);
+    t.textContent = `${hi.toFixed(2)} · 전체 ${turn.scores.length}개 중 상위 ${turn.candidates.length}개`;
+    return s;
+  }
+
+  function answerView(turn) {
+    const p = h("p", { class: "answer" });
+    const parts = turn.answer.split(/(\[\d+\]|\*\*[^*]+\*\*)/g);
+    for (const part of parts) {
+      const m = part.match(/^\[(\d+)\]$/);
+      if (m && turn.candidates?.[Number(m[1]) - 1]) {
+        const c = turn.candidates[Number(m[1]) - 1];
+        const i = indexOf(c.id);
+        const chip = h("span", { class: "cite", title: items[i]?.label || c.id, role: "button", tabindex: "0" }, m[1]);
+        chip.addEventListener("pointerenter", () => { if (activeTurn === turn) { hoverIndex = i; render(); } });
+        chip.addEventListener("pointerleave", () => { hoverIndex = null; render(); });
+        chip.addEventListener("click", () => { if (activeTurn !== turn) selectTurn(turn); if (i >= 0) selectPoint(i); });
+        p.append(chip);
+      } else if (/^\*\*[^*]+\*\*$/.test(part)) {
+        p.append(h("strong", {}, part.slice(2, -2)));
+      } else if (part) {
+        p.append(part);
+      }
+    }
+    return p;
+  }
+
+  if (matchMedia("(max-width: 600px)").matches) $("showLabels").checked = false;
+  load();
+})();
+</script>
+</body>
+</html>

@@ -321,6 +321,7 @@
     <button id="reset" type="button">다시 배치</button>
     <a id="export" href="/api/export.jsonld" hidden><button type="button" tabindex="-1">JSON-LD 내보내기</button></a>
     <a id="connect" href="/connect" hidden><button type="button" tabindex="-1">AI 연결 (MCP)</button></a>
+    <a id="embedMap" href="/embed" hidden><button type="button" tabindex="-1">임베딩 지도</button></a>
     <button id="theme" type="button" aria-label="테마 바꾸기">테마</button>
   </div>
 </header>
@@ -3133,6 +3134,7 @@
     document.getElementById("addNode").hidden = !api.canEdit;
     document.getElementById("export").hidden = !api.online;
     document.getElementById("connect").hidden = !api.online;
+    document.getElementById("embedMap").hidden = !api.online;
     document.querySelectorAll('#tabs button[data-tab="trash"], #tabs button[data-tab="history"]').forEach((b) => (b.hidden = !api.canEdit));
     document.getElementById("sourceHint").textContent = api.online
       ? "데이터: Cloudflare D1에 저장된 그래프 (schema.org 기반 JSON-LD로 내보낼 수 있음)."
