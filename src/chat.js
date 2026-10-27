@@ -10,8 +10,8 @@ const MAX_STEPS = 6;
 const MAX_HISTORY = 12;
 const MAX_MESSAGE_CHARS = 1000;
 const MAX_TOOL_RESULT_CHARS = 6000;
-const DAILY_LIMIT_VISITOR = 30;
-const DAILY_LIMIT_EDITOR = 200;
+export const DAILY_LIMIT_VISITOR = 30;
+export const DAILY_LIMIT_EDITOR = 200;
 // Large or redundant for chatting; the chatbot looks things up with the smaller tools instead.
 const HIDDEN_TOOLS = new Set(["export_jsonld"]);
 
@@ -42,7 +42,8 @@ function systemPrompt(canWrite) {
 
 // ---------- Daily quota ----------
 
-async function useQuota(env, key, limit) {
+// Shared with the embedding map's chat (embed.js) so both count against one daily budget.
+export async function useQuota(env, key, limit) {
   const day = new Date().toISOString().slice(0, 10);
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS chat_usage (key TEXT NOT NULL, day TEXT NOT NULL, n INTEGER NOT NULL, PRIMARY KEY (key, day))").run();
   const row = await env.DB.prepare(

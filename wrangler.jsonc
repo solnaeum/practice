@@ -10,7 +10,9 @@
     "binding": "ASSETS",
     "run_worker_first": ["/", "/api/*", "/mcp", "/mcp/*"]
   },
-  // 챗봇이 쓰는 Workers AI (무료 플랜: 하루 10,000 뉴런)
+  // 임베딩 지도(src/embed.js)가 저장소의 Markdown 문서를 문자열로 import 한다.
+  "rules": [{ "type": "Text", "globs": ["**/*.md"], "fallthrough": true }],
+  // 챗봇과 임베딩 지도가 쓰는 Workers AI (무료 플랜: 하루 10,000 뉴런). 임베딩은 @cf/baai/bge-m3, 결과는 D1 embeddings 표에 캐시한다.
   "ai": { "binding": "AI" },
   "d1_databases": [
     {

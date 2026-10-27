@@ -1,10 +1,12 @@
-// titan-graph Worker: 그래프 데이터(D1)를 읽고 고치는 /api/*, 챗봇 /api/chat, AI 도구용 MCP 서버 /mcp,
+// titan-graph Worker: 그래프 데이터(D1)를 읽고 고치는 /api/*, 챗봇 /api/chat, 임베딩 지도용 /api/embeddings·/api/embed-chat,
+// AI 도구용 MCP 서버 /mcp,
 // 그리고 최신 그래프를 넣어 그려 보내는 첫 페이지(/)와 정적 파일을 함께 서비스한다.
 // 읽기는 누구나, 쓰기는 편집 비밀번호로 로그인한 사용자(웹·챗봇)나 MCP 토큰을 가진 클라이언트만 할 수 있다.
 
 import { SESSION_SECONDS, createSession, passwordMatches, readSession, sessionCookie } from "./auth.js";
 import { handleMcp } from "./mcp.js";
 import { handleChat } from "./chat.js";
+import { embeddingsResponse, handleEmbedChat } from "./embed.js";
 import {
   HttpError, assertNotLockedOut, recordLoginFailure, ensureSeeded,
   loadGraph, listNotes, listTrash, listHistory, revertHistory,
@@ -74,6 +76,7 @@ async function route(request, env, url, ctx) {
     if (path === "/api/me") return json(await me(request, env));
     if (path === "/api/graph") return json(await loadGraph(env));
     if (path === "/api/notes") return json({ notes: await listNotes(env) });
+    if (path === "/api/embeddings") return json(await embeddingsResponse(env));
     if (path === "/api/export.jsonld") {
       const { doc } = await loadGraph(env);
       return new Response(JSON.stringify(doc, null, 2), {
@@ -91,6 +94,7 @@ async function route(request, env, url, ctx) {
 
   if (method === "POST" && path === "/api/login") return login(request, env);
   if (method === "POST" && path === "/api/chat") return handleChat(request, env, ctx, await currentUser(request, env), await readJson(request));
+  if (method === "POST" && path === "/api/embed-chat") return handleEmbedChat(request, env, ctx, await currentUser(request, env), await readJson(request));
   if (method === "POST" && path === "/api/logout") return json({ ok: true }, 200, { "set-cookie": sessionCookie("", 0) });
 
   const actor = await requireEditor(request, env);
