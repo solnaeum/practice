@@ -1,0 +1,491 @@
+{
+  "@context": {
+    "@vocab": "https://schema.org/",
+    "schema": "https://schema.org/",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "owl": "http://www.w3.org/2002/07/owl#",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+    "giant": "https://github.com/solnaeum/practice/ontology#",
+    "@base": "https://github.com/solnaeum/practice/data/",
+    "@language": "ko"
+  },
+  "@graph": [
+    {
+      "@id": "https://github.com/solnaeum/practice/ontology",
+      "@type": "owl:Ontology",
+      "rdfs:label": "거인 이야기 온톨로지",
+      "rdfs:comment": "「진격의 거인」과 「걸리버 여행기」 정리 문서(attack_on_titan_imdb.md, gullivers_travels_giants.md)를 schema.org 어휘로 옮긴 그래프. schema.org에 없는 개념만 giant: 네임스페이스로 정의한다."
+    },
+
+    {
+      "@id": "giant:FictionalCharacter",
+      "@type": "rdfs:Class",
+      "rdfs:label": "등장인물",
+      "rdfs:subClassOf": {"@id": "schema:Person"},
+      "rdfs:comment": "작품 속 인물. schema:character의 값으로 쓰기 위해 schema:Person을 확장한다."
+    },
+    {
+      "@id": "giant:FictionalPlace",
+      "@type": "rdfs:Class",
+      "rdfs:label": "가상의 장소",
+      "rdfs:subClassOf": {"@id": "schema:Place"}
+    },
+    {
+      "@id": "giant:FictionalOrganization",
+      "@type": "rdfs:Class",
+      "rdfs:label": "가상의 조직",
+      "rdfs:subClassOf": {"@id": "schema:Organization"}
+    },
+    {
+      "@id": "giant:Species",
+      "@type": "rdfs:Class",
+      "rdfs:label": "종족",
+      "rdfs:subClassOf": {"@id": "schema:Thing"},
+      "rdfs:comment": "작품 속 종족. 거인인지, 사람과 비교한 크기를 함께 기록한다."
+    },
+    {
+      "@id": "giant:Theme",
+      "@type": "rdfs:Class",
+      "rdfs:label": "주제",
+      "rdfs:subClassOf": {"@id": "schema:Thing"}
+    },
+
+    {
+      "@id": "giant:hasTheme",
+      "@type": "rdf:Property",
+      "rdfs:label": "주제",
+      "rdfs:subPropertyOf": {"@id": "schema:about"},
+      "schema:domainIncludes": {"@id": "schema:CreativeWork"},
+      "schema:rangeIncludes": {"@id": "giant:Theme"}
+    },
+    {
+      "@id": "giant:species",
+      "@type": "rdf:Property",
+      "rdfs:label": "종족",
+      "schema:domainIncludes": {"@id": "giant:FictionalCharacter"},
+      "schema:rangeIncludes": {"@id": "giant:Species"}
+    },
+    {
+      "@id": "giant:inhabits",
+      "@type": "rdf:Property",
+      "rdfs:label": "사는 곳",
+      "schema:domainIncludes": {"@id": "giant:Species"},
+      "schema:rangeIncludes": {"@id": "giant:FictionalPlace"}
+    },
+    {
+      "@id": "giant:isGiant",
+      "@type": "rdf:Property",
+      "rdfs:label": "거인 여부",
+      "schema:domainIncludes": {"@id": "giant:Species"},
+      "schema:rangeIncludes": {"@id": "schema:Boolean"}
+    },
+    {
+      "@id": "giant:scaleRelativeToHuman",
+      "@type": "rdf:Property",
+      "rdfs:label": "사람 대비 크기",
+      "rdfs:comment": "보통 사람의 키를 1로 볼 때의 배율.",
+      "schema:domainIncludes": {"@id": "giant:Species"},
+      "schema:rangeIncludes": {"@id": "schema:Number"}
+    },
+    {
+      "@id": "giant:voicedBy",
+      "@type": "rdf:Property",
+      "rdfs:label": "성우",
+      "schema:domainIncludes": {"@id": "giant:FictionalCharacter"},
+      "schema:rangeIncludes": {"@id": "schema:Person"}
+    },
+    {
+      "@id": "giant:japaneseVoice",
+      "@type": "rdf:Property",
+      "rdfs:label": "일본어 성우",
+      "rdfs:subPropertyOf": {"@id": "giant:voicedBy"}
+    },
+    {
+      "@id": "giant:englishVoice",
+      "@type": "rdf:Property",
+      "rdfs:label": "영어 더빙 성우",
+      "rdfs:subPropertyOf": {"@id": "giant:voicedBy"}
+    },
+    {
+      "@id": "giant:memberOf",
+      "@type": "rdf:Property",
+      "rdfs:label": "소속",
+      "rdfs:subPropertyOf": {"@id": "schema:memberOf"},
+      "schema:domainIncludes": {"@id": "giant:FictionalCharacter"},
+      "schema:rangeIncludes": {"@id": "giant:FictionalOrganization"}
+    },
+    {
+      "@id": "giant:comparableTo",
+      "@type": ["rdf:Property", "owl:SymmetricProperty"],
+      "rdfs:label": "비교 대상",
+      "rdfs:comment": "두 작품을 나란히 비교할 수 있음을 나타낸다. 대칭 관계.",
+      "schema:domainIncludes": {"@id": "schema:CreativeWork"},
+      "schema:rangeIncludes": {"@id": "schema:CreativeWork"}
+    },
+
+    {
+      "@id": "work/attack-on-titan",
+      "@type": "TVSeries",
+      "name": ["진격의 거인", {"@value": "Attack on Titan", "@language": "en"}, {"@value": "進撃の巨人", "@language": "ja"}],
+      "alternateName": {"@value": "Shingeki no Kyojin", "@language": "ja-Latn"},
+      "identifier": {"@value": "tt2560140", "@type": "xsd:string"},
+      "sameAs": {"@id": "https://www.imdb.com/title/tt2560140/"},
+      "genre": ["애니메이션", "액션", "어드벤처", "드라마", "판타지"],
+      "startDate": {"@value": "2013-04-07", "@type": "xsd:date"},
+      "endDate": {"@value": "2023-11-05", "@type": "xsd:date"},
+      "numberOfSeasons": 4,
+      "numberOfEpisodes": 94,
+      "countryOfOrigin": {"@id": "place/japan"},
+      "inLanguage": {"@value": "ja", "@type": "xsd:string"},
+      "creator": {"@id": "person/hajime-isayama"},
+      "isBasedOn": {"@id": "work/attack-on-titan-manga"},
+      "productionCompany": [{"@id": "org/wit-studio"}, {"@id": "org/mappa"}],
+      "containsSeason": [
+        {"@id": "work/attack-on-titan/season-1"},
+        {"@id": "work/attack-on-titan/season-2"},
+        {"@id": "work/attack-on-titan/season-3"},
+        {"@id": "work/attack-on-titan/season-4"}
+      ],
+      "character": [
+        {"@id": "character/eren-yeager"},
+        {"@id": "character/mikasa-ackerman"},
+        {"@id": "character/armin-arlert"},
+        {"@id": "character/levi"}
+      ],
+      "contentLocation": {"@id": "place/walls"},
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": 9.1,
+        "bestRating": 10,
+        "ratingCount": 608000,
+        "description": "IMDb 평점 페이지 스냅샷 기준(날짜 미상). 비가중 평균 8.6."
+      },
+      "description": "거인에게 고향과 어머니를 잃은 엘런 예거가 거인을 모두 몰아내겠다고 맹세하고, 미카사·아르민과 함께 조사병단에 들어가 거인과 성벽 밖 세계의 진실에 다가가는 이야기.",
+      "giant:hasTheme": [{"@id": "theme/giant-as-mirror"}, {"@id": "theme/freedom"}, {"@id": "theme/cycle-of-war"}],
+      "giant:comparableTo": {"@id": "work/gullivers-travels"},
+      "subjectOf": {"@id": "https://github.com/solnaeum/practice/blob/main/attack_on_titan_imdb.md"}
+    },
+    {
+      "@id": "work/attack-on-titan-manga",
+      "@type": "ComicSeries",
+      "name": ["진격의 거인 (만화)", {"@value": "進撃の巨人", "@language": "ja"}],
+      "author": {"@id": "person/hajime-isayama"},
+      "publisher": {"@id": "org/kodansha"},
+      "isPartOf": {"@id": "work/bessatsu-shonen-magazine"},
+      "startDate": {"@value": "2009-09-09", "@type": "xsd:date"},
+      "endDate": {"@value": "2021-04-09", "@type": "xsd:date"},
+      "description": "전 34권."
+    },
+    {
+      "@id": "work/bessatsu-shonen-magazine",
+      "@type": "Periodical",
+      "name": ["별책 소년 매거진", {"@value": "別冊少年マガジン", "@language": "ja"}],
+      "publisher": {"@id": "org/kodansha"}
+    },
+    {
+      "@id": "work/attack-on-titan/season-1",
+      "@type": "TVSeason",
+      "name": "진격의 거인 시즌 1",
+      "seasonNumber": 1,
+      "numberOfEpisodes": 25,
+      "startDate": {"@value": "2013-04-07", "@type": "xsd:date"},
+      "endDate": {"@value": "2013-09-29", "@type": "xsd:date"},
+      "partOfSeries": {"@id": "work/attack-on-titan"},
+      "productionCompany": {"@id": "org/wit-studio"}
+    },
+    {
+      "@id": "work/attack-on-titan/season-2",
+      "@type": "TVSeason",
+      "name": "진격의 거인 시즌 2",
+      "seasonNumber": 2,
+      "numberOfEpisodes": 12,
+      "startDate": {"@value": "2017-04-01", "@type": "xsd:date"},
+      "endDate": {"@value": "2017-06-17", "@type": "xsd:date"},
+      "partOfSeries": {"@id": "work/attack-on-titan"},
+      "productionCompany": {"@id": "org/wit-studio"}
+    },
+    {
+      "@id": "work/attack-on-titan/season-3",
+      "@type": "TVSeason",
+      "name": "진격의 거인 시즌 3",
+      "seasonNumber": 3,
+      "numberOfEpisodes": 22,
+      "description": "Part 1(12화)과 Part 2(10화)로 나뉘어 2018~2019년 방영.",
+      "partOfSeries": {"@id": "work/attack-on-titan"},
+      "productionCompany": {"@id": "org/wit-studio"}
+    },
+    {
+      "@id": "work/attack-on-titan/season-4",
+      "@type": "TVSeason",
+      "name": ["진격의 거인 The Final Season", {"@value": "Attack on Titan: The Final Season", "@language": "en"}],
+      "seasonNumber": 4,
+      "numberOfEpisodes": 35,
+      "description": "2020~2023년 방영. 본편 35화와 특별편 2편.",
+      "partOfSeries": {"@id": "work/attack-on-titan"},
+      "productionCompany": {"@id": "org/mappa"}
+    },
+
+    {
+      "@id": "work/gullivers-travels",
+      "@type": "Book",
+      "name": ["걸리버 여행기", {"@value": "Gulliver's Travels", "@language": "en"}],
+      "alternateName": {"@value": "Travels into Several Remote Nations of the World", "@language": "en"},
+      "author": {"@id": "person/jonathan-swift"},
+      "datePublished": {"@value": "1726", "@type": "xsd:gYear"},
+      "countryOfOrigin": {"@id": "place/england"},
+      "inLanguage": {"@value": "en", "@type": "xsd:string"},
+      "genre": ["풍자 소설", "모험 소설"],
+      "hasPart": [
+        {"@id": "work/gullivers-travels/part-1"},
+        {"@id": "work/gullivers-travels/part-2"},
+        {"@id": "work/gullivers-travels/part-3"},
+        {"@id": "work/gullivers-travels/part-4"}
+      ],
+      "character": {"@id": "character/lemuel-gulliver"},
+      "description": "배의 외과의사 레뮤얼 걸리버가 직접 쓴 여행기 형식의 4부 구성 풍자 소설.",
+      "giant:hasTheme": [{"@id": "theme/giant-as-mirror"}, {"@id": "theme/satire-of-society"}, {"@id": "theme/relativity-of-scale"}],
+      "giant:comparableTo": {"@id": "work/attack-on-titan"},
+      "subjectOf": {"@id": "https://github.com/solnaeum/practice/blob/main/gullivers_travels_giants.md"}
+    },
+    {
+      "@id": "work/gullivers-travels/part-1",
+      "@type": "CreativeWork",
+      "name": "1부 — 릴리퍼트 여행",
+      "position": 1,
+      "isPartOf": {"@id": "work/gullivers-travels"},
+      "contentLocation": [{"@id": "place/lilliput"}, {"@id": "place/blefuscu"}],
+      "temporalCoverage": "1699",
+      "character": {"@id": "character/lemuel-gulliver"},
+      "description": "난파한 걸리버가 소인국 릴리퍼트에서 '인간 산'으로 불리는 거인이 된다. 블레퍼스쿠 함대를 끌고 와 영웅이 되지만, 반역죄로 몰려 도망친다.",
+      "giant:hasTheme": {"@id": "theme/satire-of-society"}
+    },
+    {
+      "@id": "work/gullivers-travels/part-2",
+      "@type": "CreativeWork",
+      "name": "2부 — 브롭딩낵 여행",
+      "position": 2,
+      "isPartOf": {"@id": "work/gullivers-travels"},
+      "contentLocation": {"@id": "place/brobdingnag"},
+      "temporalCoverage": "1702",
+      "character": [
+        {"@id": "character/lemuel-gulliver"},
+        {"@id": "character/glumdalclitch"},
+        {"@id": "character/king-of-brobdingnag"}
+      ],
+      "description": "거인국 브롭딩낵에서 걸리버가 소인이 된다. 구경거리가 되었다가 왕궁에 팔려 가고, 왕과 대화하며 인간 사회의 부패를 지적받는다. 독수리가 상자를 채 가면서 탈출한다.",
+      "giant:hasTheme": [{"@id": "theme/giant-as-mirror"}, {"@id": "theme/relativity-of-scale"}, {"@id": "theme/satire-of-society"}]
+    },
+    {
+      "@id": "work/gullivers-travels/part-3",
+      "@type": "CreativeWork",
+      "name": "3부 — 라퓨타 등 여행",
+      "position": 3,
+      "isPartOf": {"@id": "work/gullivers-travels"},
+      "contentLocation": [{"@id": "place/laputa"}, {"@id": "place/luggnagg"}],
+      "description": "하늘을 나는 섬 라퓨타의 학자들, 쓸모없는 연구, 죽지 않고 늙기만 하는 스트럴드브럭.",
+      "giant:hasTheme": {"@id": "theme/satire-of-society"}
+    },
+    {
+      "@id": "work/gullivers-travels/part-4",
+      "@type": "CreativeWork",
+      "name": "4부 — 후이늠의 나라 여행",
+      "position": 4,
+      "isPartOf": {"@id": "work/gullivers-travels"},
+      "contentLocation": {"@id": "place/houyhnhnm-land"},
+      "description": "이성적인 말 후이늠과 짐승 같은 인간 야후의 나라. 귀국한 걸리버는 인간을 견디지 못한다.",
+      "giant:hasTheme": {"@id": "theme/satire-of-society"}
+    },
+
+    {
+      "@id": "person/hajime-isayama",
+      "@type": "Person",
+      "name": ["이사야마 하지메", {"@value": "Hajime Isayama", "@language": "en"}, {"@value": "諫山創", "@language": "ja"}],
+      "jobTitle": "만화가",
+      "nationality": {"@id": "place/japan"}
+    },
+    {
+      "@id": "person/jonathan-swift",
+      "@type": "Person",
+      "name": ["조너선 스위프트", {"@value": "Jonathan Swift", "@language": "en"}],
+      "jobTitle": "작가"
+    },
+    {"@id": "person/yuki-kaji", "@type": "Person", "name": ["카지 유키", {"@value": "Yuki Kaji", "@language": "en"}], "jobTitle": "성우"},
+    {"@id": "person/yui-ishikawa", "@type": "Person", "name": ["이시카와 유이", {"@value": "Yui Ishikawa", "@language": "en"}], "jobTitle": "성우"},
+    {"@id": "person/marina-inoue", "@type": "Person", "name": ["이노우에 마리나", {"@value": "Marina Inoue", "@language": "en"}], "jobTitle": "성우"},
+    {"@id": "person/hiroshi-kamiya", "@type": "Person", "name": ["카미야 히로시", {"@value": "Hiroshi Kamiya", "@language": "en"}], "jobTitle": "성우"},
+    {"@id": "person/bryce-papenbrook", "@type": "Person", "name": {"@value": "Bryce Papenbrook", "@language": "en"}, "jobTitle": "성우"},
+    {"@id": "person/trina-nishimura", "@type": "Person", "name": {"@value": "Trina Nishimura", "@language": "en"}, "jobTitle": "성우"},
+    {"@id": "person/josh-grelle", "@type": "Person", "name": {"@value": "Josh Grelle", "@language": "en"}, "alternateName": {"@value": "Jessie James Grelle", "@language": "en"}, "jobTitle": "성우"},
+    {"@id": "person/matthew-mercer", "@type": "Person", "name": {"@value": "Matthew Mercer", "@language": "en"}, "jobTitle": "성우"},
+
+    {"@id": "org/wit-studio", "@type": "Organization", "name": {"@value": "WIT STUDIO", "@language": "en"}, "description": "진격의 거인 시즌 1~3 제작."},
+    {"@id": "org/mappa", "@type": "Organization", "name": {"@value": "MAPPA", "@language": "en"}, "description": "진격의 거인 시즌 4(The Final Season) 제작."},
+    {"@id": "org/kodansha", "@type": "Organization", "name": ["고단샤", {"@value": "Kodansha", "@language": "en"}]},
+
+    {"@id": "place/japan", "@type": "Country", "name": ["일본", {"@value": "Japan", "@language": "en"}]},
+    {"@id": "place/england", "@type": "Country", "name": ["영국", {"@value": "England", "@language": "en"}]},
+
+    {
+      "@id": "character/eren-yeager",
+      "@type": "giant:FictionalCharacter",
+      "name": ["엘런 예거", {"@value": "Eren Yeager", "@language": "en"}],
+      "description": "고향과 어머니를 거인에게 잃고 거인을 모두 몰아내겠다고 맹세한 주인공.",
+      "giant:species": {"@id": "species/human-aot"},
+      "giant:memberOf": {"@id": "org/survey-corps"},
+      "knows": [{"@id": "character/mikasa-ackerman"}, {"@id": "character/armin-arlert"}],
+      "giant:japaneseVoice": {"@id": "person/yuki-kaji"},
+      "giant:englishVoice": {"@id": "person/bryce-papenbrook"}
+    },
+    {
+      "@id": "character/mikasa-ackerman",
+      "@type": "giant:FictionalCharacter",
+      "name": ["미카사 아커만", {"@value": "Mikasa Ackerman", "@language": "en"}],
+      "description": "엘런의 소꿉친구.",
+      "giant:species": {"@id": "species/human-aot"},
+      "giant:memberOf": {"@id": "org/survey-corps"},
+      "knows": [{"@id": "character/eren-yeager"}, {"@id": "character/armin-arlert"}],
+      "giant:japaneseVoice": {"@id": "person/yui-ishikawa"},
+      "giant:englishVoice": {"@id": "person/trina-nishimura"}
+    },
+    {
+      "@id": "character/armin-arlert",
+      "@type": "giant:FictionalCharacter",
+      "name": ["아르민 알레르토", {"@value": "Armin Arlert", "@language": "en"}],
+      "description": "엘런의 소꿉친구.",
+      "giant:species": {"@id": "species/human-aot"},
+      "giant:memberOf": {"@id": "org/survey-corps"},
+      "knows": [{"@id": "character/eren-yeager"}, {"@id": "character/mikasa-ackerman"}],
+      "giant:japaneseVoice": {"@id": "person/marina-inoue"},
+      "giant:englishVoice": {"@id": "person/josh-grelle"}
+    },
+    {
+      "@id": "character/levi",
+      "@type": "giant:FictionalCharacter",
+      "name": ["리바이", {"@value": "Levi", "@language": "en"}],
+      "giant:species": {"@id": "species/human-aot"},
+      "giant:memberOf": {"@id": "org/survey-corps"},
+      "giant:japaneseVoice": {"@id": "person/hiroshi-kamiya"},
+      "giant:englishVoice": {"@id": "person/matthew-mercer"}
+    },
+    {
+      "@id": "org/survey-corps",
+      "@type": "giant:FictionalOrganization",
+      "name": ["조사병단", {"@value": "Survey Corps", "@language": "en"}],
+      "description": "성벽 밖으로 나가 거인과 싸우며 바깥 세계를 조사하는 병단.",
+      "location": {"@id": "place/walls"}
+    },
+    {
+      "@id": "place/walls",
+      "@type": "giant:FictionalPlace",
+      "name": ["성벽 안 세계", {"@value": "The Walls", "@language": "en"}],
+      "description": "거인을 피해 인류가 살아가는 세 겹의 거대한 성벽."
+    },
+    {
+      "@id": "species/titan",
+      "@type": "giant:Species",
+      "name": ["거인", {"@value": "Titan", "@language": "en"}],
+      "description": "사람을 잡아먹는 거대한 인간형 생물. 어느 날 초대형 거인이 성벽을 부순다.",
+      "giant:isGiant": true,
+      "subjectOf": {"@id": "work/attack-on-titan"}
+    },
+    {
+      "@id": "species/human-aot",
+      "@type": "giant:Species",
+      "name": "인류 (진격의 거인)",
+      "giant:isGiant": false,
+      "giant:scaleRelativeToHuman": 1,
+      "giant:inhabits": {"@id": "place/walls"},
+      "subjectOf": {"@id": "work/attack-on-titan"}
+    },
+
+    {
+      "@id": "character/lemuel-gulliver",
+      "@type": "giant:FictionalCharacter",
+      "name": ["레뮤얼 걸리버", {"@value": "Lemuel Gulliver", "@language": "en"}],
+      "jobTitle": "배의 외과의사",
+      "description": "릴리퍼트에서는 거인이, 브롭딩낵에서는 소인이 되는 주인공이자 화자.",
+      "giant:species": {"@id": "species/human-gulliver"},
+      "homeLocation": {"@id": "place/england"}
+    },
+    {
+      "@id": "character/glumdalclitch",
+      "@type": "giant:FictionalCharacter",
+      "name": ["글럼달클리치", {"@value": "Glumdalclitch", "@language": "en"}],
+      "description": "걸리버를 발견한 농부의 아홉 살 난 딸. '작은 유모'라는 뜻으로, 걸리버를 돌보며 왕궁까지 함께 간다.",
+      "giant:species": {"@id": "species/brobdingnagian"},
+      "knows": {"@id": "character/lemuel-gulliver"}
+    },
+    {
+      "@id": "character/king-of-brobdingnag",
+      "@type": "giant:FictionalCharacter",
+      "name": ["브롭딩낵의 왕", {"@value": "King of Brobdingnag", "@language": "en"}],
+      "description": "걸리버의 설명을 듣고 그의 동족을 '가장 해로운 작고 혐오스러운 벌레들'이라 평하며, 화약 제조법 제안을 거절한다.",
+      "giant:species": {"@id": "species/brobdingnagian"},
+      "knows": {"@id": "character/lemuel-gulliver"}
+    },
+    {
+      "@id": "species/human-gulliver",
+      "@type": "giant:Species",
+      "name": "인간 (걸리버 여행기)",
+      "giant:isGiant": false,
+      "giant:scaleRelativeToHuman": 1,
+      "subjectOf": {"@id": "work/gullivers-travels"}
+    },
+    {
+      "@id": "species/lilliputian",
+      "@type": "giant:Species",
+      "name": ["릴리퍼트 사람 (소인)", {"@value": "Lilliputian", "@language": "en"}],
+      "description": "키 15cm 남짓한 소인. 이들 앞에서 걸리버는 '인간 산'이 된다.",
+      "giant:isGiant": false,
+      "giant:scaleRelativeToHuman": 0.083,
+      "giant:inhabits": [{"@id": "place/lilliput"}, {"@id": "place/blefuscu"}],
+      "subjectOf": {"@id": "work/gullivers-travels"}
+    },
+    {
+      "@id": "species/brobdingnagian",
+      "@type": "giant:Species",
+      "name": ["브롭딩낵 사람 (거인)", {"@value": "Brobdingnagian", "@language": "en"}],
+      "description": "키가 교회 첨탑만 한 거인. 전쟁보다 농사와 실용적인 지식을 중시하는 평화로운 사람들.",
+      "giant:isGiant": true,
+      "giant:scaleRelativeToHuman": 12,
+      "giant:inhabits": {"@id": "place/brobdingnag"},
+      "subjectOf": {"@id": "work/gullivers-travels"}
+    },
+    {
+      "@id": "species/houyhnhnm",
+      "@type": "giant:Species",
+      "name": ["후이늠", {"@value": "Houyhnhnm", "@language": "en"}],
+      "description": "이성적이고 정직한 말(馬).",
+      "giant:isGiant": false,
+      "giant:inhabits": {"@id": "place/houyhnhnm-land"},
+      "subjectOf": {"@id": "work/gullivers-travels"}
+    },
+    {
+      "@id": "species/yahoo",
+      "@type": "giant:Species",
+      "name": ["야후", {"@value": "Yahoo", "@language": "en"}],
+      "description": "후이늠의 나라에서 짐승처럼 사는 인간.",
+      "giant:isGiant": false,
+      "giant:inhabits": {"@id": "place/houyhnhnm-land"},
+      "subjectOf": {"@id": "work/gullivers-travels"}
+    },
+    {"@id": "place/lilliput", "@type": "giant:FictionalPlace", "name": ["릴리퍼트", {"@value": "Lilliput", "@language": "en"}], "description": "소인국."},
+    {"@id": "place/blefuscu", "@type": "giant:FictionalPlace", "name": ["블레퍼스쿠", {"@value": "Blefuscu", "@language": "en"}], "description": "달걀 깨는 방향을 두고 릴리퍼트와 전쟁 중인 이웃 소인국."},
+    {"@id": "place/brobdingnag", "@type": "giant:FictionalPlace", "name": ["브롭딩낵", {"@value": "Brobdingnag", "@language": "en"}], "description": "거인국."},
+    {"@id": "place/laputa", "@type": "giant:FictionalPlace", "name": ["라퓨타", {"@value": "Laputa", "@language": "en"}], "description": "하늘을 떠다니는 섬."},
+    {"@id": "place/luggnagg", "@type": "giant:FictionalPlace", "name": ["러그낵", {"@value": "Luggnagg", "@language": "en"}], "description": "죽지 않는 스트럴드브럭이 사는 나라."},
+    {"@id": "place/houyhnhnm-land", "@type": "giant:FictionalPlace", "name": ["후이늠의 나라", {"@value": "Land of the Houyhnhnms", "@language": "en"}]},
+
+    {
+      "@id": "theme/giant-as-mirror",
+      "@type": "giant:Theme",
+      "name": "거인을 거울 삼아 인간을 돌아봄",
+      "description": "두 작품의 공통 주제. 거인을 무찔러야 할 괴물로만 그리지 않고, 인간이 얼마나 작고 잔혹한지 비추는 거울로 쓴다."
+    },
+    {"@id": "theme/freedom", "@type": "giant:Theme", "name": "자유"},
+    {"@id": "theme/cycle-of-war", "@type": "giant:Theme", "name": "전쟁과 증오의 악순환"},
+    {"@id": "theme/satire-of-society", "@type": "giant:Theme", "name": "인간 사회의 부패와 전쟁 풍자"},
+    {"@id": "theme/relativity-of-scale", "@type": "giant:Theme", "name": "크기와 관점의 상대성", "description": "같은 인간도 보는 크기에 따라 아름다움과 추함이 달라진다."}
+  ]
+}
