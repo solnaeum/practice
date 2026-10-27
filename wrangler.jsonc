@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  // Cloudflare 대시보드의 Worker 이름과 같아야 Workers Builds가 배포한다.
+  "name": "titan-graph",
+  "compatibility_date": "2026-10-13",
+  // Worker 스크립트 없이 public/ 폴더의 정적 파일만 배포한다.
+  "assets": {
+    "directory": "./public/"
+  }
+}
