@@ -2,9 +2,22 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   // Cloudflare 대시보드의 Worker 이름과 같아야 Workers Builds가 배포한다.
   "name": "titan-graph",
+  "main": "src/index.js",
   "compatibility_date": "2026-10-13",
-  // Worker 스크립트 없이 public/ 폴더의 정적 파일만 배포한다.
+  // /api/* 는 Worker가 처리하고, 나머지는 public/ 의 정적 파일을 그대로 내보낸다.
   "assets": {
-    "directory": "./public/"
-  }
+    "directory": "./public/",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "titan-graph-db",
+      "database_id": "a707bc41-726e-4ccc-a1f9-1df212cf6fbd",
+      "migrations_dir": "migrations"
+    }
+  ],
+  // TEAM_DOMAIN, POLICY_AUD 는 대시보드에서 설정한다. 배포할 때 지워지지 않게 유지한다.
+  "keep_vars": true
 }

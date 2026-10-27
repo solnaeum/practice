@@ -14,6 +14,7 @@
     --edge: #b9b6ad;
     --edge-hi: #3d3b36;
     --accent: #2f5fd0;
+    --danger: #c0392b;
     --g-work: #2f5fd0;
     --g-character: #d0572f;
     --g-person: #8a5cc8;
@@ -22,6 +23,12 @@
     --g-species: #c23b6b;
     --g-theme: #1f8fa6;
     --g-class: #7a7870;
+    --note-yellow: #fff1a6;
+    --note-pink: #ffd3e0;
+    --note-blue: #cfe6ff;
+    --note-green: #d4f2c9;
+    --note-text: #262522;
+    --note-shadow: 0 2px 6px rgba(0, 0, 0, .18);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -33,6 +40,7 @@
       --edge: #55534d;
       --edge-hi: #e8e6df;
       --accent: #7ea2ff;
+      --danger: #ff7b6b;
       --g-work: #7ea2ff;
       --g-character: #ff8a5c;
       --g-person: #b896f0;
@@ -41,6 +49,11 @@
       --g-species: #f07aa3;
       --g-theme: #5cc6db;
       --g-class: #a3a19a;
+      --note-yellow: #e9d77a;
+      --note-pink: #e6b3c4;
+      --note-blue: #a9c8ea;
+      --note-green: #b2d6a6;
+      --note-shadow: 0 2px 8px rgba(0, 0, 0, .5);
     }
   }
   :root[data-theme="dark"] {
@@ -52,6 +65,7 @@
     --edge: #55534d;
     --edge-hi: #e8e6df;
     --accent: #7ea2ff;
+    --danger: #ff7b6b;
     --g-work: #7ea2ff;
     --g-character: #ff8a5c;
     --g-person: #b896f0;
@@ -60,6 +74,11 @@
     --g-species: #f07aa3;
     --g-theme: #5cc6db;
     --g-class: #a3a19a;
+    --note-yellow: #e9d77a;
+    --note-pink: #e6b3c4;
+    --note-blue: #a9c8ea;
+    --note-green: #b2d6a6;
+    --note-shadow: 0 2px 8px rgba(0, 0, 0, .5);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
@@ -68,7 +87,7 @@
     color: var(--text);
     font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
     display: grid;
-    grid-template-columns: 1fr 340px;
+    grid-template-columns: 1fr 360px;
     grid-template-rows: auto 1fr;
     height: 100vh;
   }
@@ -84,16 +103,19 @@
   }
   header h1 { font-size: 16px; margin: 0; font-weight: 650; }
   header .stats { color: var(--muted); font-size: 13px; }
+  .mode { font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--muted); }
+  .mode.editing { color: var(--accent); border-color: var(--accent); }
   .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-left: auto; }
-  input[type="search"] {
+  input, select, textarea {
     font: inherit;
-    padding: 5px 10px;
+    padding: 5px 8px;
     border: 1px solid var(--line);
     border-radius: 6px;
     background: var(--bg);
     color: var(--text);
-    width: 180px;
   }
+  input[type="search"] { width: 170px; }
+  input[type="checkbox"] { padding: 0; }
   button, label.toggle {
     font: inherit;
     font-size: 13px;
@@ -107,6 +129,10 @@
     align-items: center;
     gap: 6px;
   }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+  button:disabled { opacity: .5; cursor: default; }
+  [hidden] { display: none !important; }
   #stage { position: relative; overflow: hidden; min-height: 0; }
   svg { width: 100%; height: 100%; display: block; cursor: grab; touch-action: none; }
   svg.panning { cursor: grabbing; }
@@ -122,6 +148,51 @@
   .node:focus-visible circle { stroke: var(--accent); stroke-width: 3; }
   .node text { font-size: 12px; fill: var(--text); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
   .node.class-node circle { stroke-dasharray: 3 2; stroke: var(--g-class); fill: var(--bg) !important; stroke-width: 2; }
+  .note-link { stroke: var(--muted); stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
+
+  /* Sticky notes live in an HTML layer above the SVG and follow pan/zoom. */
+  #noteLayer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .note {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 170px;
+    pointer-events: auto;
+    background: var(--note-yellow);
+    color: var(--note-text);
+    border-radius: 3px;
+    box-shadow: var(--note-shadow);
+    font-size: 13px;
+    transform-origin: 0 0;
+  }
+  .note[data-color="pink"] { background: var(--note-pink); }
+  .note[data-color="blue"] { background: var(--note-blue); }
+  .note[data-color="green"] { background: var(--note-green); }
+  .note .bar { display: flex; align-items: center; gap: 4px; padding: 3px 4px 0 8px; min-height: 22px; cursor: default; }
+  .note.editable .bar { cursor: grab; }
+  .note.dragging .bar { cursor: grabbing; }
+  .note .who { font-size: 10px; opacity: .6; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .note .dot { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,.25); padding: 0; cursor: pointer; flex: none; }
+  .note .dot[data-c="yellow"] { background: var(--note-yellow); }
+  .note .dot[data-c="pink"] { background: var(--note-pink); }
+  .note .dot[data-c="blue"] { background: var(--note-blue); }
+  .note .dot[data-c="green"] { background: var(--note-green); }
+  .note .x { border: none; background: none; color: inherit; opacity: .55; padding: 0 4px; font-size: 15px; line-height: 1; cursor: pointer; }
+  .note textarea {
+    display: block;
+    width: 100%;
+    min-height: 70px;
+    resize: vertical;
+    border: none;
+    background: transparent;
+    color: inherit;
+    padding: 4px 8px 8px;
+    font: inherit;
+    line-height: 1.45;
+    outline: none;
+  }
+  .note textarea[readonly] { resize: none; cursor: default; }
+
   aside {
     border-left: 1px solid var(--line);
     background: var(--panel);
@@ -131,6 +202,8 @@
   }
   aside h2 { font-size: 15px; margin: 0 0 4px; }
   aside h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 6px; font-weight: 600; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
   .legend { display: grid; gap: 4px; }
   .legend label { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; }
   .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
@@ -141,13 +214,31 @@
   dt { color: var(--muted); }
   dd { margin: 0; overflow-wrap: anywhere; }
   .rel { display: grid; gap: 2px; font-size: 13px; }
-  .rel a, .rel button.link {
+  .rel > div { display: flex; align-items: baseline; gap: 4px; }
+  .rel a, .rel button.link, button.link {
     color: var(--accent);
     background: none; border: none; padding: 0; font: inherit; cursor: pointer; text-align: left;
   }
   .rel .p { color: var(--muted); }
+  button.mini { padding: 0 6px; font-size: 12px; line-height: 18px; margin-left: auto; }
   .iri { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
   .hint { color: var(--muted); font-size: 13px; }
+  form.edit { display: grid; gap: 8px; font-size: 13px; }
+  form.edit label { display: grid; gap: 3px; color: var(--muted); }
+  form.edit label > * { color: var(--text); }
+  form.edit textarea { min-height: 70px; resize: vertical; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .row > input, .row > select { flex: 1; min-width: 0; }
+  .list { display: grid; gap: 6px; font-size: 13px; }
+  .list .item { display: flex; gap: 8px; align-items: flex-start; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .list .item .body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .list .meta { color: var(--muted); font-size: 12px; }
+  #toast {
+    position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 13px;
+    box-shadow: 0 4px 14px rgba(0,0,0,.25); max-width: calc(100vw - 32px); z-index: 10;
+  }
+  #toast.error { background: var(--danger); color: #fff; }
   @media (max-width: 760px) {
     body { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; height: auto; }
     aside { border-left: none; border-top: 1px solid var(--line); }
@@ -160,11 +251,16 @@
 <header>
   <h1>거인 이야기 그래프</h1>
   <span class="stats" id="stats"></span>
+  <span class="mode" id="mode">불러오는 중</span>
   <div class="controls">
     <input type="search" id="search" placeholder="노드 검색" aria-label="노드 검색">
     <label class="toggle"><input type="checkbox" id="showLabels"> 관계 이름</label>
     <label class="toggle"><input type="checkbox" id="showOntology"> 온톨로지 클래스</label>
+    <label class="toggle"><input type="checkbox" id="showNotes" checked> 메모</label>
+    <button id="addNote" type="button" hidden>+ 메모</button>
+    <button id="addNode" type="button" hidden>+ 노드</button>
     <button id="reset" type="button">다시 배치</button>
+    <a id="export" href="/api/export.jsonld" hidden><button type="button" tabindex="-1">JSON-LD 내보내기</button></a>
     <button id="theme" type="button" aria-label="테마 바꾸기">테마</button>
   </div>
 </header>
@@ -179,22 +275,29 @@
       </marker>
     </defs>
     <g id="viewport">
+      <g id="noteLinks"></g>
       <g id="edges"></g>
       <g id="elabels"></g>
       <g id="nodes"></g>
     </g>
   </svg>
+  <div id="noteLayer"></div>
 </div>
 <aside>
-  <div id="detail">
-    <h2>노드를 선택하세요</h2>
-    <p class="hint">노드를 누르면 속성과 연결된 관계가 여기에 나옵니다. 끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다.</p>
+  <div class="tabs" id="tabs">
+    <button type="button" data-tab="detail" aria-pressed="true">노드</button>
+    <button type="button" data-tab="trash" aria-pressed="false" hidden>휴지통</button>
+    <button type="button" data-tab="history" aria-pressed="false" hidden>변경 기록</button>
   </div>
-  <h3>노드 종류</h3>
-  <div class="legend" id="legend"></div>
-  <h3>출처</h3>
-  <p class="hint">데이터: <code>titan.jsonld</code> (schema.org 기반 JSON-LD). 이 페이지는 <code>tools/build_titan_graph.py</code>로 생성됩니다.</p>
+  <div id="panel"></div>
+  <div id="legendBox">
+    <h3>노드 종류</h3>
+    <div class="legend" id="legend"></div>
+    <h3>출처</h3>
+    <p class="hint" id="sourceHint">데이터: <code>titan.jsonld</code> (schema.org 기반 JSON-LD). 이 페이지는 <code>tools/build_titan_graph.py</code>로 생성됩니다.</p>
+  </div>
 </aside>
+<div id="toast" role="status" hidden></div>
 
 <script type="application/ld+json" id="titan-data">
 {
@@ -1373,17 +1476,55 @@
 }
 </script>
 <script>
-(function () {
+(async function () {
   "use strict";
 
-  const doc = JSON.parse(document.getElementById("titan-data").textContent);
-  const ctx = doc["@context"];
+  const embeddedDoc = JSON.parse(document.getElementById("titan-data").textContent);
   const SCHEMA = "https://schema.org/";
 
-  // ---------- IRI helpers ----------
-  const prefixes = {};
-  for (const [k, v] of Object.entries(ctx)) {
-    if (typeof v === "string" && !k.startsWith("@")) prefixes[k] = v;
+  // ---------- API ----------
+  const api = { online: false, canEdit: false, email: null, accessConfigured: false };
+
+  async function request(method, path, body) {
+    const opts = { method, credentials: "same-origin", headers: {} };
+    if (method !== "GET") {
+      opts.headers["content-type"] = "application/json";
+      opts.body = JSON.stringify(body || {});
+    }
+    const res = await fetch(path, opts);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `요청이 실패했습니다 (${res.status})`);
+    return data;
+  }
+  const qs = (id) => "?id=" + encodeURIComponent(id);
+
+  let toastTimer = null;
+  function toast(message, isError) {
+    const t = document.getElementById("toast");
+    t.textContent = message;
+    t.classList.toggle("error", !!isError);
+    t.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (t.hidden = true), isError ? 5000 : 2500);
+  }
+  async function mutate(method, path, body, okMessage) {
+    try {
+      const result = await request(method, path, body);
+      if (okMessage) toast(okMessage);
+      return result;
+    } catch (err) {
+      toast(err.message, true);
+      throw err;
+    }
+  }
+
+  // ---------- IRI helpers (context is replaced on every rebuild) ----------
+  let ctx = {};
+  let prefixes = {};
+  function setContext(c) {
+    ctx = c || {};
+    prefixes = {};
+    for (const [k, v] of Object.entries(ctx)) if (typeof v === "string" && !k.startsWith("@")) prefixes[k] = v;
   }
   function expand(id) {
     const i = id.indexOf(":");
@@ -1398,6 +1539,13 @@
     for (const [k, v] of Object.entries(prefixes)) if (iri.startsWith(v) && k !== "schema") return k + ":" + iri.slice(v.length);
     if (iri.startsWith(SCHEMA)) return "schema:" + iri.slice(SCHEMA.length);
     return iri;
+  }
+  // Back from a full IRI to the id string stored in the database.
+  function localId(iri) {
+    const base = ctx["@base"] || "";
+    if (base && iri.startsWith(base)) return iri.slice(base.length);
+    const c = compact(iri);
+    return c.startsWith("schema:") ? iri : c;
   }
   const asArray = (v) => (v === undefined ? [] : Array.isArray(v) ? v : [v]);
   const isRef = (v) => v && typeof v === "object" && Object.keys(v).length === 1 && "@id" in v;
@@ -1415,7 +1563,7 @@
     return null;
   }
 
-  // ---------- Labels for schema.org properties ----------
+  // ---------- Labels ----------
   const propLabel = {
     "schema:creator": "원작자", "schema:author": "작가", "schema:isBasedOn": "원작",
     "schema:productionCompany": "제작사", "schema:containsSeason": "시즌", "schema:partOfSeries": "소속 시리즈",
@@ -1429,53 +1577,57 @@
     "schema:description": "설명", "schema:jobTitle": "직업", "schema:position": "순서", "schema:temporalCoverage": "시기",
     "schema:aggregateRating": "평점", "schema:ratingValue": "평점", "schema:bestRating": "만점", "schema:ratingCount": "투표 수"
   };
-  // Inverse pairs: draw only one direction when both are present.
   const inverseOf = { "schema:partOfSeries": "schema:containsSeason", "schema:isPartOf": "schema:hasPart" };
   const symmetric = new Set(["giant:comparableTo", "schema:knows"]);
 
-  // ---------- Groups ----------
   const groups = [
-    { key: "work", label: "작품", types: ["TVSeries", "TVSeason", "Book", "ComicSeries", "Periodical", "CreativeWork"] },
-    { key: "character", label: "등장인물", types: ["giant:FictionalCharacter"] },
-    { key: "person", label: "실존 인물", types: ["Person"] },
-    { key: "org", label: "조직", types: ["Organization", "giant:FictionalOrganization"] },
-    { key: "place", label: "장소", types: ["Country", "Place", "giant:FictionalPlace"] },
-    { key: "species", label: "종족", types: ["giant:Species"] },
-    { key: "theme", label: "주제", types: ["giant:Theme"] },
+    { key: "work", label: "작품", types: ["TVSeries", "TVSeason", "Book", "ComicSeries", "Periodical", "CreativeWork"], prefix: "work/" },
+    { key: "character", label: "등장인물", types: ["giant:FictionalCharacter"], prefix: "character/" },
+    { key: "person", label: "실존 인물", types: ["Person"], prefix: "person/" },
+    { key: "org", label: "조직", types: ["Organization", "giant:FictionalOrganization"], prefix: "org/" },
+    { key: "place", label: "장소", types: ["Country", "Place", "giant:FictionalPlace"], prefix: "place/" },
+    { key: "species", label: "종족", types: ["giant:Species"], prefix: "species/" },
+    { key: "theme", label: "주제", types: ["giant:Theme"], prefix: "theme/" },
     { key: "class", label: "온톨로지 클래스", types: [] }
   ];
-  const groupOfType = {};
-  groups.forEach((g) => g.types.forEach((t) => (groupOfType[expandTerm(t)] = g.key)));
 
-  // ---------- Build nodes and edges ----------
-  const graph = doc["@graph"];
-  const byIri = new Map();
-  const propDefs = new Map(); // property IRI -> label
-  const classDefs = [];
+  // ---------- Graph state ----------
+  let byIri = new Map(), classNodes = new Map(), propDefs = new Map();
+  let edgeIdByKey = new Map(); // "sourceIri|compactProp|targetIri" -> database edge id
+  let nodes = [], allEdges = [], nodeByIri = new Map();
+  let notes = [];
+  const hiddenGroups = new Set(["class"]);
+  let showLabels = false, showNotes = true;
+  let selected = null, searchTerm = "", tab = "detail";
+  let firstBuild = true;
 
-  for (const n of graph) {
-    const iri = expand(n["@id"]);
-    const types = asArray(n["@type"]).map(expandTerm);
-    if (types.includes(expandTerm("rdf:Property"))) {
-      propDefs.set(iri, koName(n["rdfs:label"]) || compact(iri));
-      continue;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("graph");
+  const viewport = document.getElementById("viewport");
+  const gEdges = document.getElementById("edges");
+  const gLabels = document.getElementById("elabels");
+  const gNodes = document.getElementById("nodes");
+  const gNoteLinks = document.getElementById("noteLinks");
+  const noteLayer = document.getElementById("noteLayer");
+  const color = (g) => `var(--g-${g})`;
+  const radius = (n) => (n.isClass ? 8 : 6 + Math.min(10, Math.sqrt(n.degree) * 2.4));
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function h(tag, props, ...children) {
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (k === "on") for (const [ev, fn] of Object.entries(v)) e.addEventListener(ev, fn);
+      else if (k in e && k !== "list") e[k] = v;
+      else e.setAttribute(k, v);
     }
-    if (types.includes(expandTerm("owl:Ontology"))) continue;
-    if (types.includes(expandTerm("rdfs:Class"))) { classDefs.push(n); continue; }
-    byIri.set(iri, { iri, raw: n, types, group: types.map((t) => groupOfType[t]).find(Boolean) || "work" });
+    for (const c of children.flat()) if (c !== null && c !== undefined && c !== false) e.append(c);
+    return e;
   }
-
-  // Class nodes: the custom classes plus every schema.org type actually used.
-  const classNodes = new Map();
-  function addClass(iri, raw) {
-    if (classNodes.has(iri)) return classNodes.get(iri);
-    const c = { iri, raw: raw || null, types: [expandTerm("rdfs:Class")], group: "class", isClass: true };
-    classNodes.set(iri, c);
-    return c;
-  }
-  classDefs.forEach((c) => addClass(expand(c["@id"]), c));
-  byIri.forEach((n) => n.types.forEach((t) => addClass(t)));
-  classDefs.forEach((c) => asArray(c["rdfs:subClassOf"]).forEach((s) => addClass(expand(s["@id"]))));
 
   function labelOf(n) {
     if (n.raw) {
@@ -1490,79 +1642,119 @@
     return propLabel[compact(iri)] || propLabel[key] || compact(iri);
   }
 
-  const allEdges = [];
-  const edgeKeys = new Set();
-  function addEdge(s, t, key, isTypeEdge) {
-    const pc = compact(expandTerm(key));
-    const k = s + "|" + pc + "|" + t;
-    if (edgeKeys.has(k)) return;
-    if (symmetric.has(pc) && edgeKeys.has(t + "|" + pc + "|" + s)) return;
-    edgeKeys.add(k);
-    allEdges.push({ source: s, target: t, prop: pc, label: isTypeEdge ? "유형" : propName(key), symmetric: symmetric.has(pc), typeEdge: !!isTypeEdge });
-  }
-  byIri.forEach((n) => {
-    for (const [key, val] of Object.entries(n.raw)) {
-      if (key.startsWith("@")) continue;
-      for (const v of asArray(val)) {
-        if (!isRef(v)) continue;
-        const t = expand(v["@id"]);
-        if (!byIri.has(t)) continue;
-        const pc = compact(expandTerm(key));
-        if (inverseOf[pc] && asArray(byIri.get(t).raw[inverseOf[pc].replace("schema:", "")]).some((x) => isRef(x) && expand(x["@id"]) === n.iri)) continue;
-        addEdge(n.iri, t, key);
-      }
+  function rebuild(doc, edgeRows) {
+    setContext(doc["@context"]);
+    const groupOfType = {};
+    groups.forEach((g) => g.types.forEach((t) => (groupOfType[expandTerm(t)] = g.key)));
+
+    edgeIdByKey = new Map();
+    (edgeRows || []).forEach((r) => edgeIdByKey.set(expand(r.source) + "|" + compact(expandTerm(r.prop)) + "|" + expand(r.target), r.id));
+
+    const old = new Map(nodes.map((n) => [n.iri, n]));
+    byIri = new Map(); classNodes = new Map(); propDefs = new Map();
+    const classDefs = [];
+    for (const n of doc["@graph"]) {
+      const iri = expand(n["@id"]);
+      const types = asArray(n["@type"]).map(expandTerm);
+      if (types.includes(expandTerm("rdf:Property"))) { propDefs.set(iri, koName(n["rdfs:label"]) || compact(iri)); continue; }
+      if (types.includes(expandTerm("owl:Ontology"))) continue;
+      if (types.includes(expandTerm("rdfs:Class"))) { classDefs.push(n); continue; }
+      byIri.set(iri, { iri, id: n["@id"], raw: n, types, group: types.map((t) => groupOfType[t]).find(Boolean) || "work" });
     }
-    n.types.forEach((t) => addEdge(n.iri, t, "rdf:type", true));
-  });
-  classDefs.forEach((c) => asArray(c["rdfs:subClassOf"]).forEach((s) => addEdge(expand(c["@id"]), expand(s["@id"]), "rdfs:subClassOf")));
+    const addClass = (iri, raw) => {
+      if (!classNodes.has(iri)) classNodes.set(iri, { iri, id: raw ? raw["@id"] : null, raw: raw || null, types: [expandTerm("rdfs:Class")], group: "class", isClass: true });
+    };
+    classDefs.forEach((c) => addClass(expand(c["@id"]), c));
+    byIri.forEach((n) => n.types.forEach((t) => addClass(t)));
+    classDefs.forEach((c) => asArray(c["rdfs:subClassOf"]).forEach((s) => addClass(expand(s["@id"]))));
 
-  const nodes = [...byIri.values(), ...classNodes.values()];
-  const nodeByIri = new Map(nodes.map((n) => [n.iri, n]));
-  nodes.forEach((n) => { n.label = labelOf(n); n.degree = 0; });
-  allEdges.forEach((e) => { if (!e.typeEdge) { nodeByIri.get(e.source).degree++; nodeByIri.get(e.target).degree++; } });
+    allEdges = [];
+    const keys = new Set();
+    const addEdge = (s, t, key, isTypeEdge) => {
+      const pc = compact(expandTerm(key));
+      const k = s + "|" + pc + "|" + t;
+      if (keys.has(k) || (symmetric.has(pc) && keys.has(t + "|" + pc + "|" + s))) return;
+      keys.add(k);
+      allEdges.push({
+        source: s, target: t, prop: pc, key,
+        label: isTypeEdge ? "유형" : propName(key),
+        symmetric: symmetric.has(pc), typeEdge: !!isTypeEdge,
+        id: isTypeEdge ? null : edgeIdByKey.get(k) || null
+      });
+    };
+    byIri.forEach((n) => {
+      for (const [key, val] of Object.entries(n.raw)) {
+        if (key.startsWith("@")) continue;
+        for (const v of asArray(val)) {
+          if (!isRef(v)) continue;
+          const t = expand(v["@id"]);
+          if (!byIri.has(t)) continue;
+          const pc = compact(expandTerm(key));
+          if (inverseOf[pc] && asArray(byIri.get(t).raw[inverseOf[pc].replace("schema:", "")]).some((x) => isRef(x) && expand(x["@id"]) === n.iri)) continue;
+          addEdge(n.iri, t, key);
+        }
+      }
+      n.types.forEach((t) => addEdge(n.iri, t, "rdf:type", true));
+    });
+    classDefs.forEach((c) => asArray(c["rdfs:subClassOf"]).forEach((s) => addEdge(expand(c["@id"]), expand(s["@id"]), "rdfs:subClassOf")));
 
-  // ---------- State ----------
-  const hiddenGroups = new Set(["class"]);
-  let showLabels = false;
-  let selected = null;
-  let searchTerm = "";
+    nodes = [...byIri.values(), ...classNodes.values()];
+    nodeByIri = new Map(nodes.map((n) => [n.iri, n]));
+    nodes.forEach((n) => { n.label = labelOf(n); n.degree = 0; });
+    allEdges.forEach((e) => {
+      e.s = nodeByIri.get(e.source);
+      e.t = nodeByIri.get(e.target);
+      if (!e.typeEdge) { e.s.degree++; e.t.degree++; }
+    });
 
-  // ---------- SVG ----------
-  const NS = "http://www.w3.org/2000/svg";
-  const svg = document.getElementById("graph");
-  const viewport = document.getElementById("viewport");
-  const gEdges = document.getElementById("edges");
-  const gLabels = document.getElementById("elabels");
-  const gNodes = document.getElementById("nodes");
-  const color = (g) => `var(--g-${g})`;
-  const radius = (n) => (n.isClass ? 8 : 6 + Math.min(10, Math.sqrt(n.degree) * 2.4));
+    // Keep positions of nodes that already existed; place new ones next to a neighbour.
+    let placedNew = false;
+    nodes.forEach((n) => {
+      const prev = old.get(n.iri);
+      if (prev && prev.x !== undefined) { n.x = prev.x; n.y = prev.y; n.vx = 0; n.vy = 0; return; }
+      const nb = allEdges.find((e) => (e.source === n.iri && old.has(e.target)) || (e.target === n.iri && old.has(e.source)));
+      const anchor = nb ? old.get(nb.source === n.iri ? nb.target : nb.source) : null;
+      n.x = (anchor ? anchor.x : W / 2) + (Math.random() - 0.5) * 60;
+      n.y = (anchor ? anchor.y : H / 2) + (Math.random() - 0.5) * 60;
+      n.vx = 0; n.vy = 0;
+      placedNew = true;
+    });
+    if (selected) selected = nodeByIri.get(selected.iri) || null;
 
-  function el(tag, attrs, parent) {
-    const e = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
-    if (parent) parent.appendChild(e);
-    return e;
+    renderSvg();
+    renderLegend();
+    if (firstBuild) {
+      seed();
+      settle();
+      firstBuild = false;
+    } else {
+      draw();
+      if (placedNew) reheat(0.4);
+    }
+    applyVisibility();
+    renderPanel();
   }
 
-  nodes.forEach((n) => {
-    const g = el("g", { class: "node" + (n.isClass ? " class-node" : ""), tabindex: "0", role: "button", "aria-label": n.label }, gNodes);
-    el("circle", { r: radius(n), fill: color(n.group) }, g);
-    const t = el("text", { x: radius(n) + 4, y: 4 }, g);
-    t.textContent = n.label;
-    n.el = g;
-    g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n); } });
-    g.addEventListener("pointerdown", (ev) => startDrag(ev, n));
-  });
-  allEdges.forEach((e) => {
-    e.s = nodeByIri.get(e.source);
-    e.t = nodeByIri.get(e.target);
-    e.el = el("path", { class: "edge", "marker-end": e.symmetric ? "" : "url(#arrow)" }, gEdges);
-    if (e.typeEdge) e.el.setAttribute("stroke-dasharray", "3 3");
-    e.lel = el("text", { class: "elabel", "text-anchor": "middle" }, gLabels);
-    e.lel.textContent = e.label;
-  });
+  function renderSvg() {
+    gNodes.replaceChildren(); gEdges.replaceChildren(); gLabels.replaceChildren();
+    nodes.forEach((n) => {
+      const g = el("g", { class: "node" + (n.isClass ? " class-node" : ""), tabindex: "0", role: "button", "aria-label": n.label }, gNodes);
+      el("circle", { r: radius(n), fill: color(n.group) }, g);
+      const t = el("text", { x: radius(n) + 4, y: 4 }, g);
+      t.textContent = n.label;
+      n.el = g;
+      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n); } });
+      g.addEventListener("pointerdown", (ev) => startDrag(ev, n));
+    });
+    allEdges.forEach((e) => {
+      e.el = el("path", { class: "edge", "marker-end": e.symmetric ? "" : "url(#arrow)" }, gEdges);
+      if (e.typeEdge) e.el.setAttribute("stroke-dasharray", "3 3");
+      e.lel = el("text", { class: "elabel", "text-anchor": "middle" }, gLabels);
+      e.lel.textContent = e.label;
+    });
+  }
 
-  // ---------- Visibility ----------
+  // ---------- Visibility & highlight ----------
   const visible = (n) => !hiddenGroups.has(n.group);
   const edgeVisible = (e) => visible(e.s) && visible(e.t) && (!e.typeEdge || !hiddenGroups.has("class"));
   function applyVisibility() {
@@ -1572,10 +1764,9 @@
       e.el.style.display = v ? "" : "none";
       e.lel.style.display = v ? "" : "none";
     });
-    const vn = nodes.filter(visible).length;
-    const ve = allEdges.filter(edgeVisible).length;
-    document.getElementById("stats").textContent = `노드 ${vn}개 · 엣지 ${ve}개`;
+    document.getElementById("stats").textContent = `노드 ${nodes.filter(visible).length}개 · 엣지 ${allEdges.filter(edgeVisible).length}개` + (notes.length ? ` · 메모 ${notes.length}개` : "");
     applyHighlight();
+    renderNotes();
   }
 
   function applyHighlight() {
@@ -1609,55 +1800,73 @@
 
   // ---------- Legend ----------
   const legend = document.getElementById("legend");
-  groups.forEach((g) => {
-    const count = nodes.filter((n) => n.group === g.key).length;
-    const lab = document.createElement("label");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.checked = !hiddenGroups.has(g.key);
-    cb.addEventListener("change", () => {
-      if (cb.checked) hiddenGroups.delete(g.key); else hiddenGroups.add(g.key);
-      if (g.key === "class") document.getElementById("showOntology").checked = cb.checked;
-      if (selected && !visible(selected)) select(null);
-      applyVisibility();
-      settle();
+  function renderLegend() {
+    legend.replaceChildren();
+    groups.forEach((g) => {
+      const cb = h("input", { type: "checkbox", checked: !hiddenGroups.has(g.key) });
+      cb.addEventListener("change", () => setGroupVisible(g.key, cb.checked));
+      const sw = h("span", { className: "swatch" + (g.key === "class" ? " dashed" : "") });
+      sw.style.background = color(g.key);
+      legend.append(h("label", {}, cb, sw, h("span", {}, g.label), h("span", { className: "count" }, String(nodes.filter((n) => n.group === g.key).length))));
     });
-    const sw = document.createElement("span");
-    sw.className = "swatch" + (g.key === "class" ? " dashed" : "");
-    sw.style.background = color(g.key);
-    const name = document.createElement("span");
-    name.textContent = g.label;
-    const c = document.createElement("span");
-    c.className = "count";
-    c.textContent = count;
-    lab.append(cb, sw, name, c);
-    legend.appendChild(lab);
-    g.checkbox = cb;
-  });
+  }
+  function setGroupVisible(key, on) {
+    if (on) hiddenGroups.delete(key); else hiddenGroups.add(key);
+    if (key === "class") document.getElementById("showOntology").checked = on;
+    if (selected && !visible(selected)) selected = null;
+    renderLegend();
+    applyVisibility();
+    renderPanel();
+    settle();
+  }
 
-  // ---------- Detail panel ----------
-  const detail = document.getElementById("detail");
-  function renderDetail(n) {
-    detail.innerHTML = "";
-    if (!n) {
-      detail.innerHTML = '<h2>노드를 선택하세요</h2><p class="hint">노드를 누르면 속성과 연결된 관계가 여기에 나옵니다. 끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다.</p>';
-      return;
+  // ---------- Panel ----------
+  const panel = document.getElementById("panel");
+  function setTab(next) {
+    tab = next;
+    document.querySelectorAll("#tabs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tab === tab)));
+    document.getElementById("legendBox").hidden = tab !== "detail";
+    renderPanel();
+  }
+  document.querySelectorAll("#tabs button").forEach((b) => b.addEventListener("click", () => setTab(b.dataset.tab)));
+
+  function renderPanel() {
+    if (tab === "trash") return renderTrash();
+    if (tab === "history") return renderHistory();
+    if (selected) return renderDetail(selected);
+    if (creating) return renderCreateForm();
+    panel.replaceChildren(
+      h("h2", {}, "노드를 선택하세요"),
+      h("p", { className: "hint" }, "노드를 누르면 속성과 연결된 관계가 여기에 나옵니다. 끌어서 옮기고, 휠이나 두 손가락으로 확대·축소할 수 있습니다."),
+      api.canEdit ? h("p", { className: "hint" }, "편집 모드입니다. 노드를 골라 고치거나, 위의 '+ 노드', '+ 메모'로 새로 추가할 수 있습니다. 메모는 윗부분을 끌어서 옮깁니다.") : null
+    );
+  }
+
+  // The literal part of a node (what the database stores in nodes.data).
+  function dataOf(raw) {
+    const data = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (k === "@id") continue;
+      const lits = asArray(v).filter((x) => !isRef(x));
+      if (!lits.length) continue;
+      data[k] = Array.isArray(v) && lits.length > 1 ? lits : lits[0];
     }
-    const h = document.createElement("h2");
-    h.textContent = n.label;
-    detail.appendChild(h);
-    n.types.forEach((t) => {
-      const chip = document.createElement("span");
-      chip.className = "type-chip";
-      chip.textContent = compact(t);
-      detail.appendChild(chip);
-    });
-    const iri = document.createElement("div");
-    iri.className = "iri";
-    iri.textContent = n.iri;
-    detail.appendChild(iri);
+    return data;
+  }
+  function withPlain(value, text) {
+    // Replace the first plain (default-language) string, keep other language variants.
+    const others = asArray(value).filter((v) => typeof v !== "string");
+    const list = text ? [text, ...others] : others;
+    return list.length === 0 ? undefined : list.length === 1 ? list[0] : list;
+  }
 
-    // Literal properties
+  function renderDetail(n) {
+    const kids = [h("h2", {}, n.label)];
+    n.types.forEach((t) => kids.push(h("span", { className: "type-chip" }, compact(t))));
+    kids.push(h("div", { className: "iri" }, n.iri));
+    const editable = api.canEdit && n.raw && n.id && !n.isClass;
+
+    // Literal properties and external links
     const rows = [];
     if (n.raw) {
       for (const [key, val] of Object.entries(n.raw)) {
@@ -1665,41 +1874,32 @@
         for (const v of asArray(val)) {
           if (isRef(v)) {
             const t = expand(v["@id"]);
-            if (!byIri.has(t) && !classNodes.has(t)) rows.push([propName(key), { link: t }]);
+            if (!byIri.has(t) && !classNodes.has(t)) {
+              const eid = edgeIdByKey.get(n.iri + "|" + compact(expandTerm(key)) + "|" + t);
+              rows.push([propName(key), { link: t, edgeId: eid }]);
+            }
             continue;
           }
           const text = literalText(v);
           if (text !== null) { rows.push([propName(key), text]); continue; }
-          // nested object (e.g. AggregateRating)
           const parts = [];
-          for (const [k2, v2] of Object.entries(v)) {
-            if (k2.startsWith("@")) continue;
-            parts.push(propName(k2) + " " + asArray(v2).map(literalText).join(", "));
-          }
+          for (const [k2, v2] of Object.entries(v)) if (!k2.startsWith("@")) parts.push(propName(k2) + " " + asArray(v2).map(literalText).join(", "));
           rows.push([propName(key), parts.join(" · ")]);
         }
       }
     }
     if (rows.length) {
-      const h3 = document.createElement("h3");
-      h3.textContent = "속성";
-      detail.appendChild(h3);
-      const dl = document.createElement("dl");
+      kids.push(h("h3", {}, "속성"));
+      const dl = h("dl", {});
       rows.forEach(([k, v]) => {
-        const dt = document.createElement("dt");
-        dt.textContent = k;
-        const dd = document.createElement("dd");
+        let dd;
         if (typeof v === "object") {
-          const a = document.createElement("a");
-          a.href = v.link;
-          a.target = "_blank";
-          a.rel = "noopener";
-          a.textContent = v.link.replace(/^https?:\/\//, "");
-          dd.appendChild(a);
-        } else dd.textContent = v;
-        dl.append(dt, dd);
+          dd = h("dd", {}, h("a", { href: v.link, target: "_blank", rel: "noopener" }, v.link.replace(/^https?:\/\//, "")));
+          if (editable && v.edgeId) dd.append(" ", h("button", { className: "mini danger", type: "button", title: "이 링크 삭제", on: { click: () => removeEdge(v.edgeId) } }, "삭제"));
+        } else dd = h("dd", {}, v);
+        dl.append(h("dt", {}, k), dd);
       });
-      detail.appendChild(dl);
+      kids.push(dl);
     }
 
     // Relations
@@ -1707,32 +1907,307 @@
     const inc = allEdges.filter((e) => edgeVisible(e) && e.target === n.iri);
     [["나가는 관계", out, "t"], ["들어오는 관계", inc, "s"]].forEach(([title, list, side]) => {
       if (!list.length) return;
-      const h3 = document.createElement("h3");
-      h3.textContent = `${title} (${list.length})`;
-      detail.appendChild(h3);
-      const box = document.createElement("div");
-      box.className = "rel";
-      list.forEach((e) => {
-        const row = document.createElement("div");
-        const p = document.createElement("span");
-        p.className = "p";
-        p.textContent = e.label + " → ";
-        const b = document.createElement("button");
-        b.className = "link";
-        b.type = "button";
-        b.textContent = e[side].label;
-        b.addEventListener("click", () => select(e[side]));
-        row.append(p, b);
-        box.appendChild(row);
-      });
-      detail.appendChild(box);
+      kids.push(h("h3", {}, `${title} (${list.length})`));
+      kids.push(h("div", { className: "rel" }, list.map((e) => h("div", {},
+        h("span", { className: "p" }, e.label + " → "),
+        h("button", { className: "link", type: "button", on: { click: () => select(e[side]) } }, e[side].label),
+        api.canEdit && e.id ? h("button", { className: "mini danger", type: "button", title: "관계 삭제", on: { click: () => removeEdge(e.id, e) } }, "삭제") : null
+      ))));
     });
+
+    if (editable) kids.push(...editForm(n));
+    const nodeNotes = notes.filter((x) => x.node_id === n.id);
+    if (nodeNotes.length) {
+      kids.push(h("h3", {}, `메모 (${nodeNotes.length})`));
+      kids.push(h("div", { className: "list" }, nodeNotes.map((x) => h("div", { className: "item" }, h("div", { className: "body" }, x.text || "(빈 메모)")))));
+    }
+    panel.replaceChildren(...kids);
+  }
+
+  function editForm(n) {
+    const data = dataOf(n.raw);
+    const nameInput = h("input", { value: asArray(data.name).find((v) => typeof v === "string") || "", required: true });
+    const descInput = h("textarea", { value: typeof data.description === "string" ? data.description : "" });
+    const save = async (ev) => {
+      ev.preventDefault();
+      const next = { ...data };
+      const name = withPlain(next.name, nameInput.value.trim());
+      if (name === undefined) delete next.name; else next.name = name;
+      const desc = descInput.value.trim();
+      if (desc) next.description = desc; else delete next.description;
+      await mutate("PUT", "/api/nodes" + qs(n.id), { data: next }, "저장했습니다.");
+      await reload();
+    };
+    const form = h("form", { className: "edit", on: { submit: save } },
+      h("label", {}, "이름", nameInput),
+      h("label", {}, "설명", descInput),
+      h("div", { className: "row" },
+        h("button", { className: "primary", type: "submit" }, "저장"),
+        h("button", { type: "button", on: { click: () => addNoteAt(n) } }, "메모 붙이기"),
+        h("button", { className: "danger", type: "button", on: { click: () => removeNode(n) } }, "노드 삭제")
+      )
+    );
+
+    // Add relation
+    const propOptions = new Map();
+    allEdges.forEach((e) => { if (!e.typeEdge) propOptions.set(e.key, e.label); });
+    propDefs.forEach((label, iri) => propOptions.set(compact(iri), label));
+    const propSelect = h("select", {}, [...propOptions].sort((a, b) => a[1].localeCompare(b[1], "ko")).map(([k, label]) => h("option", { value: k }, `${label} (${k})`)));
+    const listId = "targets-" + Math.random().toString(36).slice(2);
+    const targetInput = h("input", { placeholder: "도착 노드 이름 또는 https:// 주소" });
+    targetInput.setAttribute("list", listId);
+    const datalist = h("datalist", { id: listId }, [...byIri.values()].filter((x) => x !== n).map((x) => h("option", { value: x.label })));
+    const addRel = async (ev) => {
+      ev.preventDefault();
+      const text = targetInput.value.trim();
+      if (!text) return;
+      let target = text;
+      if (!/^https?:\/\//.test(text)) {
+        const found = [...byIri.values()].find((x) => x.label === text) || [...byIri.values()].find((x) => x.id === text);
+        if (!found) { toast("그 이름의 노드를 찾을 수 없습니다.", true); return; }
+        target = found.id;
+      }
+      await mutate("POST", "/api/edges", { source: n.id, prop: propSelect.value, target }, "관계를 추가했습니다.");
+      await reload();
+    };
+    const relForm = h("form", { className: "edit", on: { submit: addRel } },
+      h("label", {}, "관계", propSelect),
+      h("label", {}, "도착", targetInput),
+      datalist,
+      h("div", { className: "row" }, h("button", { className: "primary", type: "submit" }, "관계 추가"))
+    );
+    return [h("h3", {}, "편집"), form, h("h3", {}, "관계 추가"), relForm];
+  }
+
+  let creating = false;
+  function renderCreateForm() {
+    const typeSelect = h("select", {}, groups.filter((g) => g.types.length).flatMap((g) => g.types.map((t) => h("option", { value: t }, `${g.label} — ${t}`))));
+    const nameInput = h("input", { required: true, placeholder: "예: 라이너 브라운" });
+    const enInput = h("input", { placeholder: "영어 이름 (선택)" });
+    const descInput = h("textarea", {});
+    const submit = async (ev) => {
+      ev.preventDefault();
+      const type = typeSelect.value;
+      const g = groups.find((x) => x.types.includes(type));
+      const name = nameInput.value.trim();
+      const en = enInput.value.trim();
+      const slugBase = (en || name).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "n" + Date.now().toString(36);
+      let id = g.prefix + slugBase, i = 2;
+      while ([...byIri.values()].some((x) => x.id === id)) id = g.prefix + slugBase + "-" + i++;
+      const data = { "@type": type, name: en ? [name, { "@value": en, "@language": "en" }] : name };
+      if (descInput.value.trim()) data.description = descInput.value.trim();
+      await mutate("POST", "/api/nodes", { id, data }, "노드를 추가했습니다.");
+      creating = false;
+      await reload();
+      const created = nodeByIri.get(expand(id));
+      if (created) select(created);
+    };
+    panel.replaceChildren(
+      h("h2", {}, "새 노드"),
+      h("form", { className: "edit", on: { submit } },
+        h("label", {}, "종류", typeSelect),
+        h("label", {}, "이름", nameInput),
+        h("label", {}, "영어 이름", enInput),
+        h("label", {}, "설명", descInput),
+        h("div", { className: "row" },
+          h("button", { className: "primary", type: "submit" }, "추가"),
+          h("button", { type: "button", on: { click: () => { creating = false; renderPanel(); } } }, "취소"))
+      ),
+      h("p", { className: "hint" }, "추가한 뒤 노드를 골라 다른 노드와의 관계를 이어 주세요.")
+    );
+    nameInput.focus();
+  }
+
+  async function removeNode(n) {
+    if (!confirm(`'${n.label}' 노드를 삭제할까요? 연결된 관계와 붙은 메모도 함께 휴지통으로 갑니다.`)) return;
+    await mutate("DELETE", "/api/nodes" + qs(n.id), null, "휴지통으로 옮겼습니다.");
+    selected = null;
+    await reload();
+  }
+  // A symmetric or inverse-paired relation is drawn once, so delete its reverse row too.
+  async function removeEdge(id, edge) {
+    const ids = [id];
+    if (edge) {
+      const reverseProps = [];
+      if (edge.symmetric) reverseProps.push(edge.prop);
+      for (const [a, b] of Object.entries(inverseOf)) {
+        if (a === edge.prop) reverseProps.push(b);
+        if (b === edge.prop) reverseProps.push(a);
+      }
+      reverseProps.forEach((p) => {
+        const rid = edgeIdByKey.get(edge.target + "|" + p + "|" + edge.source);
+        if (rid && !ids.includes(rid)) ids.push(rid);
+      });
+    }
+    try {
+      for (const x of ids) await request("DELETE", "/api/edges" + qs(x));
+      toast(ids.length > 1 ? "관계를 삭제했습니다 (반대 방향 포함)." : "관계를 삭제했습니다.");
+    } catch (err) {
+      toast(err.message, true);
+    }
+    await reload();
+  }
+
+  const fmtTime = (iso) => { try { return new Date(iso).toLocaleString("ko-KR", { dateStyle: "short", timeStyle: "short" }); } catch { return iso; } };
+  const nameFromData = (data) => koName(data && (data.name || data["rdfs:label"])) || "";
+
+  async function renderTrash() {
+    panel.replaceChildren(h("h2", {}, "휴지통"), h("p", { className: "hint" }, "불러오는 중…"));
+    let trash;
+    try { trash = await request("GET", "/api/trash"); } catch (err) { panel.replaceChildren(h("h2", {}, "휴지통"), h("p", { className: "hint" }, err.message)); return; }
+    if (tab !== "trash") return;
+    const restore = (path, id) => async () => { await mutate("POST", path + qs(id), {}, "복원했습니다."); await reload(); };
+    const section = (title, items, render) => [h("h3", {}, `${title} (${items.length})`), items.length ? h("div", { className: "list" }, items.map(render)) : h("p", { className: "hint" }, "없음")];
+    panel.replaceChildren(
+      h("h2", {}, "휴지통"),
+      h("p", { className: "hint" }, "노드를 복원하면 함께 지워진 관계와 메모도 돌아옵니다."),
+      ...section("노드", trash.nodes, (r) => h("div", { className: "item" },
+        h("div", { className: "body" }, nameFromData(r.data) || r.id, h("div", { className: "meta" }, `${r.id} · ${fmtTime(r.deleted_at)} · ${r.updated_by || ""}`)),
+        h("button", { type: "button", on: { click: restore("/api/nodes/restore", r.id) } }, "복원"))),
+      ...section("관계", trash.edges, (r) => h("div", { className: "item" },
+        h("div", { className: "body" }, `${r.source} —${r.prop}→ ${r.target}`, h("div", { className: "meta" }, `${fmtTime(r.deleted_at)} · ${r.updated_by || ""}`)),
+        h("button", { type: "button", on: { click: restore("/api/edges/restore", r.id) } }, "복원"))),
+      ...section("메모", trash.notes, (r) => h("div", { className: "item" },
+        h("div", { className: "body" }, r.text || "(빈 메모)", h("div", { className: "meta" }, `${fmtTime(r.deleted_at)} · ${r.updated_by || ""}`)),
+        h("button", { type: "button", on: { click: restore("/api/notes/restore", r.id) } }, "복원")))
+    );
+  }
+
+  const actionLabel = { create: "추가", update: "수정", delete: "삭제", restore: "복원" };
+  const entityLabel = { node: "노드", edge: "관계", note: "메모" };
+  async function renderHistory() {
+    panel.replaceChildren(h("h2", {}, "변경 기록"), h("p", { className: "hint" }, "불러오는 중…"));
+    let history;
+    try { ({ history } = await request("GET", "/api/history?limit=100")); } catch (err) { panel.replaceChildren(h("h2", {}, "변경 기록"), h("p", { className: "hint" }, err.message)); return; }
+    if (tab !== "history") return;
+    const describe = (r) => {
+      // A delete stores the content in `before` and only the time in `after`, so merge both.
+      const snap = { ...(r.before || {}), ...(r.after || {}) };
+      if (r.entity === "node") return nameFromData(snap.data) || r.entity_id;
+      if (r.entity === "edge") return snap.source ? `${snap.source} —${snap.prop}→ ${snap.target}` : `#${r.entity_id}`;
+      return (snap.text || "").slice(0, 40) || "(빈 메모)";
+    };
+    panel.replaceChildren(
+      h("h2", {}, "변경 기록"),
+      h("p", { className: "hint" }, "수정은 '되돌리기'로 이전 값으로 돌릴 수 있습니다. 삭제는 휴지통에서 복원하세요."),
+      history.length ? h("div", { className: "list" }, history.map((r) => h("div", { className: "item" },
+        h("div", { className: "body" },
+          `${entityLabel[r.entity] || r.entity} ${actionLabel[r.action] || r.action}: ${describe(r)}`,
+          h("div", { className: "meta" }, `${fmtTime(r.at)} · ${r.actor || ""}`)),
+        r.action === "update" && r.entity !== "edge"
+          ? h("button", { type: "button", on: { click: async () => { await mutate("POST", "/api/history/revert" + qs(r.id), {}, "되돌렸습니다."); await reload(); renderHistory(); } } }, "되돌리기")
+          : null
+      ))) : h("p", { className: "hint" }, "아직 기록이 없습니다.")
+    );
   }
 
   function select(n) {
     selected = n;
-    renderDetail(n);
+    creating = false;
+    if (tab !== "detail") setTab("detail"); else renderPanel();
     applyHighlight();
+  }
+
+  // ---------- Sticky notes ----------
+  const NOTE_COLORS = ["yellow", "pink", "blue", "green"];
+  const noteEls = new Map();
+
+  function renderNotes() {
+    const seen = new Set();
+    gNoteLinks.replaceChildren();
+    if (!showNotes) { noteLayer.replaceChildren(); noteEls.clear(); return; }
+    notes.forEach((note) => {
+      seen.add(note.id);
+      let box = noteEls.get(note.id);
+      if (!box) { box = buildNote(note); noteEls.set(note.id, box); noteLayer.append(box); }
+      updateNote(box, note);
+      const target = note.node_id ? nodeByIri.get(expand(note.node_id)) : null;
+      if (target && visible(target)) note.link = el("line", { class: "note-link" }, gNoteLinks);
+      else note.link = null;
+    });
+    for (const [id, box] of noteEls) if (!seen.has(id)) { box.remove(); noteEls.delete(id); }
+    positionNotes();
+  }
+
+  function buildNote(note) {
+    const box = h("div", { className: "note" + (api.canEdit ? " editable" : "") });
+    const bar = h("div", { className: "bar" });
+    const who = h("span", { className: "who" });
+    bar.append(who);
+    if (api.canEdit) {
+      NOTE_COLORS.forEach((c) => bar.append(h("button", { className: "dot", type: "button", title: "색 바꾸기", "data-c": c, on: { click: () => saveNote(note, { color: c }) } })));
+      bar.append(h("button", { className: "x", type: "button", title: "메모 삭제", on: { click: () => deleteNote(note) } }, "×"));
+    }
+    const text = h("textarea", { readOnly: !api.canEdit, placeholder: api.canEdit ? "메모를 입력하세요" : "" });
+    text.addEventListener("change", () => saveNote(note, { text: text.value }));
+    box.append(bar, text);
+    box.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+    box.addEventListener("wheel", (ev) => ev.stopPropagation());
+    if (api.canEdit) bar.addEventListener("pointerdown", (ev) => startNoteDrag(ev, note, box));
+    box._who = who; box._text = text;
+    return box;
+  }
+  function updateNote(box, note) {
+    box.dataset.color = note.color;
+    const target = note.node_id ? nodeByIri.get(expand(note.node_id)) : null;
+    box._who.textContent = (target ? target.label + " · " : "") + (note.updated_by || "");
+    if (document.activeElement !== box._text) box._text.value = note.text;
+  }
+  function positionNotes() {
+    notes.forEach((note) => {
+      const box = noteEls.get(note.id);
+      if (!box) return;
+      // Notes are part of the canvas: placed in graph units and scaled with the zoom.
+      box.style.transform = `translate(${view.x + note.x * view.s}px, ${view.y + note.y * view.s}px) scale(${view.s})`;
+      if (note.link) {
+        const target = nodeByIri.get(expand(note.node_id));
+        note.link.setAttribute("x1", target.x); note.link.setAttribute("y1", target.y);
+        note.link.setAttribute("x2", note.x + 10 / view.s); note.link.setAttribute("y2", note.y + 10 / view.s);
+      }
+    });
+  }
+
+  async function addNoteAt(node) {
+    let x, y;
+    if (node) { x = node.x + 30; y = node.y - 90; }
+    else { const c = toGraph(svg.getBoundingClientRect().left + W / 2, svg.getBoundingClientRect().top + H / 2); x = c.x - 85; y = c.y - 50; }
+    const { note } = await mutate("POST", "/api/notes", { text: "", color: "yellow", x, y, node_id: node ? node.id : null }, "메모를 붙였습니다.");
+    notes.push(note);
+    showNotes = true;
+    document.getElementById("showNotes").checked = true;
+    applyVisibility();
+    const box = noteEls.get(note.id);
+    if (box) box._text.focus();
+  }
+  async function saveNote(note, patch) {
+    const { note: saved } = await mutate("PUT", "/api/notes" + qs(note.id), patch);
+    Object.assign(note, saved);
+    renderNotes();
+  }
+  async function deleteNote(note) {
+    await mutate("DELETE", "/api/notes" + qs(note.id), null, "메모를 휴지통으로 옮겼습니다.");
+    notes = notes.filter((x) => x.id !== note.id);
+    applyVisibility();
+  }
+  function startNoteDrag(ev, note, box) {
+    if (ev.target.closest("button")) return;
+    ev.preventDefault();
+    const start = { cx: ev.clientX, cy: ev.clientY, x: note.x, y: note.y };
+    box.classList.add("dragging");
+    box.setPointerCapture(ev.pointerId);
+    const move = (e) => {
+      note.x = start.x + (e.clientX - start.cx) / view.s;
+      note.y = start.y + (e.clientY - start.cy) / view.s;
+      positionNotes();
+    };
+    const up = () => {
+      box.classList.remove("dragging");
+      box.removeEventListener("pointermove", move);
+      box.removeEventListener("pointerup", up);
+      if (note.x !== start.x || note.y !== start.y) saveNote(note, { x: note.x, y: note.y }).catch(() => {});
+    };
+    box.addEventListener("pointermove", move);
+    box.addEventListener("pointerup", up);
   }
 
   // ---------- Force layout ----------
@@ -1742,7 +2217,7 @@
     W = r.width || 800; H = r.height || 600;
   }
   resize();
-  window.addEventListener("resize", () => { resize(); });
+  window.addEventListener("resize", resize);
 
   function seed() {
     const keys = groups.map((g) => g.key);
@@ -1755,15 +2230,12 @@
       n.vx = 0; n.vy = 0;
     });
   }
-  seed();
 
-  let alpha = 1;
-  let running = false;
+  let alpha = 1, running = false;
   function tick() {
     const vis = nodes.filter(visible);
     const es = allEdges.filter(edgeVisible);
     const k = Math.sqrt((W * H) / Math.max(vis.length, 1)) * 0.38;
-    // repulsion
     for (let i = 0; i < vis.length; i++) {
       const a = vis[i];
       for (let j = i + 1; j < vis.length; j++) {
@@ -1777,7 +2249,6 @@
         a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
       }
     }
-    // springs
     es.forEach((e) => {
       const a = e.s, b = e.t;
       const dx = b.x - a.x, dy = b.y - a.y;
@@ -1787,7 +2258,6 @@
       const fx = (dx / d) * f, fy = (dy / d) * f;
       a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
     });
-    // gravity + integrate
     vis.forEach((n) => {
       n.vx += (W / 2 - n.x) * 0.02;
       n.vy += (H / 2 - n.y) * 0.02;
@@ -1813,6 +2283,7 @@
       e.lel.setAttribute("x", ((x1 + x2) / 2).toFixed(1));
       e.lel.setAttribute("y", ((y1 + y2) / 2 - 3).toFixed(1));
     });
+    positionNotes();
   }
 
   function loop() {
@@ -1825,10 +2296,13 @@
     alpha = Math.max(alpha, a);
     if (!running) { running = true; requestAnimationFrame(loop); }
   }
+
   // ---------- Pan / zoom / drag ----------
   let view = { x: 0, y: 0, s: 1 };
-  function applyView() { viewport.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.s})`); }
-  // Scale and center the visible nodes (labels included) to fill the stage.
+  function applyView() {
+    viewport.setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.s})`);
+    positionNotes();
+  }
   function fitView() {
     const vis = nodes.filter(visible);
     if (!vis.length) return;
@@ -1836,6 +2310,11 @@
     vis.forEach((n) => {
       x0 = Math.min(x0, n.x - 12); y0 = Math.min(y0, n.y - 12);
       x1 = Math.max(x1, n.x + 12 + n.label.length * 11); y1 = Math.max(y1, n.y + 12);
+    });
+    // Notes are kept in view too (170 x about 100 graph units).
+    if (showNotes) notes.forEach((note) => {
+      x0 = Math.min(x0, note.x); y0 = Math.min(y0, note.y);
+      x1 = Math.max(x1, note.x + 170); y1 = Math.max(y1, note.y + 100);
     });
     const pad = 24;
     const s = Math.max(0.25, Math.min(2, Math.min((W - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0))));
@@ -1848,8 +2327,6 @@
     draw();
     fitView();
   }
-  // Lay out fully before the first paint, then keep the simulation idle until something moves.
-  settle();
   function toGraph(cx, cy) {
     const r = svg.getBoundingClientRect();
     return { x: (cx - r.left - view.x) / view.s, y: (cy - r.top - view.y) / view.s };
@@ -1920,30 +2397,58 @@
     const clickedBlank = !moved && panStart && !dragNode;
     endPointer(ev);
     if (clickedNode) select(clickedNode);
-    else if (clickedBlank) select(null);
+    else if (clickedBlank && selected) { selected = null; renderPanel(); applyHighlight(); }
   });
   svg.addEventListener("pointercancel", endPointer);
 
   // ---------- Controls ----------
   document.getElementById("search").addEventListener("input", (ev) => { searchTerm = ev.target.value; applyHighlight(); });
   document.getElementById("showLabels").addEventListener("change", (ev) => { showLabels = ev.target.checked; applyHighlight(); });
-  document.getElementById("showOntology").addEventListener("change", (ev) => {
-    const g = groups.find((x) => x.key === "class");
-    g.checkbox.checked = ev.target.checked;
-    g.checkbox.dispatchEvent(new Event("change"));
-  });
-  document.getElementById("reset").addEventListener("click", () => {
-    resize();
-    seed();
-    settle();
-  });
+  document.getElementById("showOntology").addEventListener("change", (ev) => setGroupVisible("class", ev.target.checked));
+  document.getElementById("showNotes").addEventListener("change", (ev) => { showNotes = ev.target.checked; renderNotes(); });
+  document.getElementById("addNote").addEventListener("click", () => addNoteAt(selected && !selected.isClass ? selected : null));
+  document.getElementById("addNode").addEventListener("click", () => { selected = null; creating = true; setTab("detail"); applyHighlight(); });
+  document.getElementById("reset").addEventListener("click", () => { resize(); seed(); settle(); });
   document.getElementById("theme").addEventListener("click", () => {
     const root = document.documentElement;
     const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
     root.dataset.theme = dark ? "light" : "dark";
   });
 
-  applyVisibility();
+  // ---------- Load ----------
+  async function reload() {
+    const [graph, noteRes] = await Promise.all([request("GET", "/api/graph"), request("GET", "/api/notes")]);
+    notes = noteRes.notes;
+    rebuild(graph.doc, graph.edges);
+  }
+
+  function setMode() {
+    const mode = document.getElementById("mode");
+    mode.classList.toggle("editing", api.canEdit);
+    mode.textContent = api.canEdit ? `편집: ${api.email}` : api.online ? "보기 전용" : "오프라인 사본";
+    document.getElementById("addNote").hidden = !api.canEdit;
+    document.getElementById("addNode").hidden = !api.canEdit;
+    document.getElementById("export").hidden = !api.online;
+    document.querySelectorAll('#tabs button[data-tab="trash"], #tabs button[data-tab="history"]').forEach((b) => (b.hidden = !api.canEdit));
+    document.getElementById("sourceHint").textContent = api.online
+      ? "데이터: Cloudflare D1에 저장된 그래프 (schema.org 기반 JSON-LD로 내보낼 수 있음)."
+      : "데이터: 페이지에 들어 있는 titan.jsonld 사본입니다. 서버에 연결되지 않아 편집할 수 없습니다.";
+  }
+
+  try {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000));
+    const meInfo = await Promise.race([request("GET", "/api/me"), timeout]);
+    Object.assign(api, meInfo, { online: true });
+    await reload();
+  } catch {
+    api.online = false;
+    api.canEdit = false;
+    notes = [];
+    rebuild(embeddedDoc, []);
+  }
+  setMode();
+  renderPanel();
+  renderNotes();
 })();
 </script>
 </body>
