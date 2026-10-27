@@ -257,6 +257,8 @@
     <label class="toggle"><input type="checkbox" id="showLabels"> 관계 이름</label>
     <label class="toggle"><input type="checkbox" id="showOntology"> 온톨로지 클래스</label>
     <label class="toggle"><input type="checkbox" id="showNotes" checked> 메모</label>
+    <button id="login" type="button" hidden>편집 로그인</button>
+    <button id="logout" type="button" hidden>로그아웃</button>
     <button id="addNote" type="button" hidden>+ 메모</button>
     <button id="addNode" type="button" hidden>+ 노드</button>
     <button id="reset" type="button">다시 배치</button>
@@ -310,7 +312,7 @@
   const SCHEMA = "https://schema.org/";
 
   // ---------- API ----------
-  const api = { online: false, canEdit: false, email: null, accessConfigured: false };
+  const api = { online: false, canEdit: false, name: null, passwordConfigured: false };
 
   async function request(method, path, body) {
     const opts = { method, credentials: "same-origin", headers: {} };
@@ -660,6 +662,7 @@
   function renderPanel() {
     if (tab === "trash") return renderTrash();
     if (tab === "history") return renderHistory();
+    if (loggingIn) return renderLoginForm();
     if (selected) return renderDetail(selected);
     if (creating) return renderCreateForm();
     panel.replaceChildren(
@@ -804,6 +807,49 @@
       h("div", { className: "row" }, h("button", { className: "primary", type: "submit" }, "관계 추가"))
     );
     return [h("h3", {}, "편집"), form, h("h3", {}, "관계 추가"), relForm];
+  }
+
+  let loggingIn = false;
+  function renderLoginForm() {
+    const pw = h("input", { type: "password", required: true, autocomplete: "current-password" });
+    const nameInput = h("input", { placeholder: "변경 기록에 남을 이름 (선택)", maxLength: 40, autocomplete: "nickname" });
+    try { nameInput.value = localStorage.getItem("titan-editor-name") || ""; } catch {}
+    const submit = async (ev) => {
+      ev.preventDefault();
+      try {
+        await request("POST", "/api/login", { password: pw.value, name: nameInput.value.trim() });
+      } catch (err) {
+        toast(err.message, true);
+        pw.select();
+        return;
+      }
+      try { localStorage.setItem("titan-editor-name", nameInput.value.trim()); } catch {}
+      loggingIn = false;
+      await refreshMe();
+      toast("편집 모드로 들어왔습니다.");
+    };
+    panel.replaceChildren(
+      h("h2", {}, "편집 로그인"),
+      h("form", { className: "edit", on: { submit } },
+        h("label", {}, "편집 비밀번호", pw),
+        h("label", {}, "이름", nameInput),
+        h("div", { className: "row" },
+          h("button", { className: "primary", type: "submit" }, "로그인"),
+          h("button", { type: "button", on: { click: () => { loggingIn = false; renderPanel(); } } }, "취소"))
+      ),
+      h("p", { className: "hint" }, "로그인은 이 브라우저에서 30일 동안 유지됩니다.")
+    );
+    pw.focus();
+  }
+
+  // Re-read permissions after login/logout and rebuild what depends on them.
+  async function refreshMe() {
+    Object.assign(api, await request("GET", "/api/me"));
+    noteLayer.replaceChildren();
+    noteEls.clear();
+    setMode();
+    renderNotes();
+    renderPanel();
   }
 
   let creating = false;
@@ -1233,6 +1279,13 @@
   document.getElementById("showLabels").addEventListener("change", (ev) => { showLabels = ev.target.checked; applyHighlight(); });
   document.getElementById("showOntology").addEventListener("change", (ev) => setGroupVisible("class", ev.target.checked));
   document.getElementById("showNotes").addEventListener("change", (ev) => { showNotes = ev.target.checked; renderNotes(); });
+  document.getElementById("login").addEventListener("click", () => { loggingIn = true; creating = false; selected = null; setTab("detail"); applyHighlight(); });
+  document.getElementById("logout").addEventListener("click", async () => {
+    await mutate("POST", "/api/logout", {}, "로그아웃했습니다.");
+    selected = null;
+    if (tab !== "detail") setTab("detail");
+    await refreshMe();
+  });
   document.getElementById("addNote").addEventListener("click", () => addNoteAt(selected && !selected.isClass ? selected : null));
   document.getElementById("addNode").addEventListener("click", () => { selected = null; creating = true; setTab("detail"); applyHighlight(); });
   document.getElementById("reset").addEventListener("click", () => { resize(); seed(); settle(); });
@@ -1252,7 +1305,9 @@
   function setMode() {
     const mode = document.getElementById("mode");
     mode.classList.toggle("editing", api.canEdit);
-    mode.textContent = api.canEdit ? `편집: ${api.email}` : api.online ? "보기 전용" : "오프라인 사본";
+    mode.textContent = api.canEdit ? `편집: ${api.name}` : api.online ? "보기 전용" : "오프라인 사본";
+    document.getElementById("login").hidden = !(api.online && !api.canEdit && api.passwordConfigured);
+    document.getElementById("logout").hidden = !api.canEdit;
     document.getElementById("addNote").hidden = !api.canEdit;
     document.getElementById("addNode").hidden = !api.canEdit;
     document.getElementById("export").hidden = !api.online;
