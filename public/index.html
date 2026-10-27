@@ -297,6 +297,7 @@
     <h3>노드 종류</h3>
     <div class="legend" id="legend"></div>
     <h3>출처</h3>
+    <p class="hint" id="webmcpHint" hidden></p>
     <p class="hint" id="sourceHint">데이터: <code>titan.jsonld</code> (schema.org 기반 JSON-LD). 이 페이지는 <code>tools/build_titan_graph.py</code>로 생성됩니다.</p>
   </div>
 </aside>
@@ -1496,7 +1497,7 @@
     }
     const res = await fetch(path, opts);
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `요청이 실패했습니다 (${res.status})`);
+    if (!res.ok) throw Object.assign(new Error(data.error || `요청이 실패했습니다 (${res.status})`), { status: res.status });
     return data;
   }
   const qs = (id) => "?id=" + encodeURIComponent(id);
@@ -1660,7 +1661,9 @@
     return propLabel[compact(iri)] || propLabel[key] || compact(iri);
   }
 
+  let currentDoc = null;
   function rebuild(doc, edgeRows) {
+    currentDoc = doc;
     setContext(doc["@context"]);
     const groupOfType = {};
     groups.forEach((g) => g.types.forEach((t) => (groupOfType[expandTerm(t)] = g.key)));
@@ -2039,6 +2042,24 @@
     setMode();
     renderNotes();
     renderPanel();
+    registerWebMcpTools();
+  }
+
+  // Ids of nodes in the trash are not on the page, so a taken id (409) is retried with the next suffix.
+  async function postNodeWithFreeId(baseId, data) {
+    const taken = (x) => [...byIri.values()].some((n) => n.id === x);
+    let id = baseId, i = 2;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      while (taken(id)) id = baseId + "-" + i++;
+      try {
+        await request("POST", "/api/nodes", { id, data });
+        return id;
+      } catch (err) {
+        if (err.status !== 409) throw err;
+        id = baseId + "-" + i++;
+      }
+    }
+    throw new Error("쓸 수 있는 노드 id를 찾지 못했습니다.");
   }
 
   let creating = false;
@@ -2058,11 +2079,16 @@
       const name = nameInput.value.trim();
       const en = enInput.value.trim();
       const slugBase = (en || name).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "n" + Date.now().toString(36);
-      let id = g.prefix + slugBase, i = 2;
-      while ([...byIri.values()].some((x) => x.id === id)) id = g.prefix + slugBase + "-" + i++;
       const data = { "@type": type, name: en ? [name, { "@value": en, "@language": "en" }] : name };
       if (descInput.value.trim()) data.description = descInput.value.trim();
-      await mutate("POST", "/api/nodes", { id, data }, "노드를 추가했습니다.");
+      let id;
+      try {
+        id = await postNodeWithFreeId(g.prefix + slugBase, data);
+        toast("노드를 추가했습니다.");
+      } catch (err) {
+        toast(err.message, true);
+        throw err;
+      }
       creating = false;
       await reload();
       const created = nodeByIri.get(expand(id));
@@ -2507,6 +2533,232 @@
     root.dataset.theme = dark ? "light" : "dark";
   });
 
+  // ---------- WebMCP ----------
+  // Registers page tools for AI agents built into the browser (W3C WebMCP draft,
+  // document.modelContext.registerTool). Read tools are always available; write tools only while
+  // this browser is logged in for editing, and they act through the same /api with that session.
+  const modelContext = document.modelContext || navigator.modelContext || null;
+  let webMcpAbort = null;
+  let webMcpCount = 0;
+
+  function nodeById(id) {
+    const n = nodeByIri.get(expand(String(id || "")));
+    if (!n || n.isClass || !n.raw) throw new Error(`노드를 찾을 수 없습니다: ${id}`);
+    return n;
+  }
+  function nodeInfo(n) {
+    const graphNodes = currentDoc ? currentDoc["@graph"] : [];
+    const nameOf = (id) => { const x = nodeByIri.get(expand(id)); return x ? x.label : id; };
+    const properties = {}, outgoing = [], incoming = [];
+    for (const [k, v] of Object.entries(n.raw)) {
+      if (k === "@id") continue;
+      const lits = asArray(v).filter((x) => !isRef(x));
+      if (lits.length) properties[k] = Array.isArray(v) && lits.length > 1 ? lits : lits[0];
+      asArray(v).filter(isRef).forEach((r) => outgoing.push({
+        relation_id: edgeIdByKey.get(n.iri + "|" + compact(expandTerm(k)) + "|" + expand(r["@id"])) || null,
+        prop: k, target: r["@id"], target_name: nameOf(r["@id"]),
+      }));
+    }
+    graphNodes.forEach((g) => {
+      for (const [k, v] of Object.entries(g)) {
+        if (k.startsWith("@")) continue;
+        asArray(v).filter((r) => isRef(r) && expand(r["@id"]) === n.iri).forEach(() => incoming.push({
+          relation_id: edgeIdByKey.get(expand(g["@id"]) + "|" + compact(expandTerm(k)) + "|" + n.iri) || null,
+          prop: k, source: g["@id"], source_name: nameOf(g["@id"]),
+        }));
+      }
+    });
+    return {
+      id: n.id, type: n.types.map(compact), name: n.label, properties, outgoing, incoming,
+      notes: notes.filter((x) => x.node_id === n.id).map(({ id, text, color }) => ({ id, text, color })),
+    };
+  }
+  const summary = (n) => ({ id: n.id, type: n.types.map(compact).join(", "), name: n.label });
+  async function afterWrite(result) {
+    await reload();
+    return result;
+  }
+
+  const NOTE_COLOR_ENUM = { type: "string", enum: ["yellow", "pink", "blue", "green"] };
+  const webMcpTools = [
+    {
+      name: "search_nodes",
+      title: "노드 검색",
+      description: "거인 이야기 그래프(진격의 거인, 걸리버 여행기)에서 이름·다른 이름·설명·id로 노드를 찾습니다. 최대 20개를 돌려줍니다.",
+      inputSchema: { type: "object", properties: { query: { type: "string", description: "검색어" }, type: { type: "string", description: "이 종류만 (선택, 예: giant:FictionalCharacter)" } }, required: ["query"] },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      async execute({ query, type }) {
+        const q = String(query || "").toLowerCase();
+        const hits = [...byIri.values()].filter((n) => {
+          if (type && !n.types.map(compact).includes(type) && !n.types.includes(expandTerm(type))) return false;
+          const text = [n.id, n.raw.name, n.raw.alternateName, n.raw.description].flatMap(asArray).map((v) => (typeof v === "string" ? v : (v && v["@value"]) || "")).join(" ").toLowerCase();
+          return text.includes(q);
+        });
+        return { count: hits.length, results: hits.slice(0, 20).map(summary) };
+      },
+    },
+    {
+      name: "get_node",
+      title: "노드 자세히 보기",
+      description: "노드의 속성, 나가는·들어오는 관계(relation_id 포함), 붙은 메모를 돌려줍니다.",
+      inputSchema: { type: "object", properties: { id: { type: "string", description: "노드 id (예: character/eren-yeager)" } }, required: ["id"] },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      async execute({ id }) { return nodeInfo(nodeById(id)); },
+    },
+    {
+      name: "show_node",
+      title: "화면에서 노드 보여 주기",
+      description: "사용자 화면의 그래프에서 노드를 선택해 강조하고, 오른쪽 패널에 자세한 내용을 엽니다. 데이터는 바뀌지 않습니다.",
+      inputSchema: { type: "object", properties: { id: { type: "string", description: "노드 id" } }, required: ["id"] },
+      annotations: { readOnlyHint: true },
+      async execute({ id }) {
+        const n = nodeById(id);
+        if (!visible(n)) setGroupVisible(n.group, true);
+        select(n);
+        return { shown: n.label };
+      },
+    },
+    {
+      name: "list_notes",
+      title: "메모 목록",
+      description: "그래프에 붙은 포스트잇 메모를 모두 돌려줍니다.",
+      inputSchema: { type: "object", properties: {} },
+      annotations: { readOnlyHint: true, untrustedContentHint: true },
+      async execute() { return { notes: notes.map(({ id, text, color, node_id, updated_by }) => ({ id, text, color, node_id, updated_by })) }; },
+    },
+    {
+      name: "add_note",
+      title: "메모 붙이기",
+      write: true,
+      description: "포스트잇 메모를 붙입니다. node_id를 주면 그 노드 옆에 붙습니다.",
+      inputSchema: { type: "object", properties: { text: { type: "string", description: "메모 내용" }, node_id: { type: "string", description: "붙일 노드 id (선택)" }, color: NOTE_COLOR_ENUM }, required: ["text"] },
+      async execute({ text, node_id, color }) {
+        const node = node_id ? nodeById(node_id) : null;
+        const { note } = await request("POST", "/api/notes", { text: String(text || ""), color: color || "yellow", node_id: node ? node.id : null, x: 0, y: 0 });
+        return afterWrite({ note_id: note.id, text: note.text, node_id: note.node_id });
+      },
+    },
+    {
+      name: "update_note",
+      title: "메모 수정",
+      write: true,
+      description: "메모의 내용이나 색을 고칩니다.",
+      inputSchema: { type: "object", properties: { note_id: { type: "integer" }, text: { type: "string" }, color: NOTE_COLOR_ENUM }, required: ["note_id"] },
+      async execute({ note_id, text, color }) {
+        const { note } = await request("PUT", "/api/notes" + qs(note_id), { text, color });
+        return afterWrite({ note_id: note.id, text: note.text, color: note.color });
+      },
+    },
+    {
+      name: "delete_note",
+      title: "메모 삭제",
+      write: true,
+      description: "메모를 휴지통으로 옮깁니다. 휴지통에서 되살릴 수 있습니다.",
+      inputSchema: { type: "object", properties: { note_id: { type: "integer" } }, required: ["note_id"] },
+      async execute({ note_id }) { return afterWrite(await request("DELETE", "/api/notes" + qs(note_id))); },
+    },
+    {
+      name: "create_node",
+      title: "노드 추가",
+      write: true,
+      description: "새 노드를 추가합니다. id는 종류와 이름으로 만들어집니다 (예: character/reiner-braun).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: groups.flatMap((g) => g.types), description: "노드 종류" },
+          name: { type: "string", description: "한국어 이름" },
+          name_en: { type: "string", description: "영어 이름 (선택)" },
+          description: { type: "string", description: "설명 (선택)" },
+        },
+        required: ["type", "name"],
+      },
+      async execute({ type, name, name_en, description }) {
+        const g = groups.find((x) => x.types.includes(type));
+        if (!g) throw new Error(`알 수 없는 종류입니다: ${type}`);
+        const slugBase = String(name_en || name).toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "n" + Date.now().toString(36);
+        const data = { "@type": type, name: name_en ? [name, { "@value": name_en, "@language": "en" }] : name };
+        if (description) data.description = description;
+        return afterWrite({ id: await postNodeWithFreeId(g.prefix + slugBase, data) });
+      },
+    },
+    {
+      name: "update_node",
+      title: "노드 수정",
+      write: true,
+      description: "노드의 한국어 이름이나 설명을 고칩니다. 넘긴 값만 바뀝니다.",
+      inputSchema: { type: "object", properties: { id: { type: "string" }, name: { type: "string" }, description: { type: "string", description: "빈 문자열이면 설명을 지웁니다" } }, required: ["id"] },
+      async execute({ id, name, description }) {
+        const n = nodeById(id);
+        const data = dataOf(n.raw);
+        if (typeof name === "string" && name.trim()) data.name = withPlain(data.name, name.trim());
+        if (typeof description === "string") { if (description.trim()) data.description = description.trim(); else delete data.description; }
+        await request("PUT", "/api/nodes" + qs(n.id), { data });
+        return afterWrite({ id: n.id });
+      },
+    },
+    {
+      name: "delete_node",
+      title: "노드 삭제",
+      write: true,
+      description: "노드를 휴지통으로 옮깁니다. 연결된 관계와 붙은 메모도 함께 옮겨지며 restore_node로 되살릴 수 있습니다.",
+      inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      annotations: { consequentialHint: true },
+      async execute({ id }) {
+        const n = nodeById(id);
+        if (selected === n) selected = null;
+        return afterWrite(await request("DELETE", "/api/nodes" + qs(n.id)));
+      },
+    },
+    {
+      name: "restore_node",
+      title: "노드 복원",
+      write: true,
+      description: "휴지통의 노드를 함께 지워진 관계·메모와 함께 되살립니다.",
+      inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+      async execute({ id }) { return afterWrite(await request("POST", "/api/nodes/restore" + qs(id), {})); },
+    },
+    {
+      name: "add_relation",
+      title: "관계 추가",
+      write: true,
+      description: "두 노드를 관계로 잇습니다. 예: source=work/attack-on-titan, prop=character, target=character/levi",
+      inputSchema: { type: "object", properties: { source: { type: "string" }, prop: { type: "string", description: "관계 이름 (예: character, author, giant:hasTheme)" }, target: { type: "string", description: "노드 id 또는 https:// 주소" } }, required: ["source", "prop", "target"] },
+      async execute({ source, prop, target }) { return afterWrite(await request("POST", "/api/edges", { source, prop, target })); },
+    },
+    {
+      name: "delete_relation",
+      title: "관계 삭제",
+      write: true,
+      description: "관계를 휴지통으로 옮깁니다. relation_id는 get_node에서 확인합니다.",
+      inputSchema: { type: "object", properties: { relation_id: { type: "integer" } }, required: ["relation_id"] },
+      annotations: { consequentialHint: true },
+      async execute({ relation_id }) { return afterWrite(await request("DELETE", "/api/edges" + qs(relation_id))); },
+    },
+  ];
+
+  function registerWebMcpTools() {
+    if (!modelContext || typeof modelContext.registerTool !== "function") return;
+    if (webMcpAbort) webMcpAbort.abort();
+    const controller = new AbortController();
+    webMcpAbort = controller;
+    const tools = webMcpTools.filter((t) => !t.write || (api.online && api.canEdit));
+    // The older navigator.modelContext preview unregistered by name instead of by signal.
+    if (typeof modelContext.unregisterTool === "function") {
+      controller.signal.addEventListener("abort", () => tools.forEach((t) => { try { modelContext.unregisterTool(t.name); } catch {} }));
+    }
+    webMcpCount = 0;
+    tools.forEach(({ write, ...tool }) => {
+      Promise.resolve(modelContext.registerTool(tool, { signal: controller.signal }))
+        .then(() => { if (webMcpAbort === controller) { webMcpCount++; showWebMcpStatus(); } })
+        .catch((err) => { if (!err || err.name !== "AbortError") console.warn("WebMCP 도구 등록 실패:", tool.name, err); });
+    });
+  }
+  function showWebMcpStatus() {
+    const hint = document.getElementById("webmcpHint");
+    hint.hidden = false;
+    hint.textContent = `이 브라우저의 AI 에이전트에게 WebMCP 도구 ${webMcpCount}개를 등록했습니다` + (api.canEdit ? " (쓰기 포함)." : " (읽기 전용 — 편집 로그인하면 쓰기 도구도 등록됩니다).");
+  }
+
   // ---------- Load ----------
   async function reload() {
     const [graph, noteRes] = await Promise.all([request("GET", "/api/graph"), request("GET", "/api/notes")]);
@@ -2544,6 +2796,7 @@
   setMode();
   renderPanel();
   renderNotes();
+  registerWebMcpTools();
 })();
 </script>
 </body>
