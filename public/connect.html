@@ -58,6 +58,7 @@
   header a { color: var(--accent); text-decoration: none; font-size: 14px; }
   header .spacer { flex: 1; }
   main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  main a { color: var(--accent); }
   h2 { font-size: 18px; margin: 36px 0 8px; }
   h3 { font-size: 15px; margin: 22px 0 6px; }
   p { margin: 6px 0 10px; }
@@ -105,7 +106,7 @@
   <button id="theme" type="button">테마</button>
 </header>
 <main>
-  <p class="lead">Claude, Cursor 같은 AI 도구가 이 그래프를 읽고 고칠 수 있도록 MCP(Model Context Protocol) 서버를 열어 두었습니다. 아래 주소를 AI 도구의 MCP 설정에 넣으면 됩니다.</p>
+  <p class="lead">Claude, Cursor 같은 AI 도구가 이 그래프를 읽고 고칠 수 있도록 MCP(Model Context Protocol) 서버를 열어 두었습니다. 아래 주소를 AI 도구의 MCP 설정에 넣으면 됩니다. 브라우저 안의 AI 에이전트는 <a href="#webmcp">WebMCP</a>로 그래프 페이지를 바로 쓸 수 있습니다.</p>
 
   <div class="card">
     <div class="url"><code id="mcpUrl">https://titan-graph.robocast.workers.dev/mcp</code><button type="button" data-copy="mcpUrl">복사</button></div>
@@ -205,6 +206,15 @@
   -H "Accept: application/json, text/event-stream" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre><button type="button" data-copy="curl">복사</button></div>
   </section>
+
+  <h2 id="webmcp">브라우저 AI 에이전트 (WebMCP)</h2>
+  <p>위의 MCP 서버와 별개로, <a href="/">그래프 페이지</a> 자체가 <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener">WebMCP</a>(W3C Web Machine Learning 커뮤니티 그룹 초안) 방식으로 도구를 등록합니다. 브라우저에 들어 있는 AI 에이전트가 페이지를 연 채로 그래프를 검색하고, 화면에서 노드를 보여 주고, 메모를 붙일 수 있습니다.</p>
+  <ul>
+    <li><b>설정 없음</b>: 서버 주소나 토큰을 넣을 필요가 없습니다. 페이지를 열면 <code>document.modelContext.registerTool()</code>로 도구가 등록됩니다.</li>
+    <li><b>권한</b>: 읽기 도구(<code>search_nodes</code>, <code>get_node</code>, <code>show_node</code>, <code>list_notes</code>)는 항상, 쓰기 도구(메모·노드·관계 추가·수정·삭제)는 그 브라우저에서 <b>편집 로그인</b>했을 때만 등록됩니다.</li>
+    <li><b>반영</b>: 에이전트가 바꾼 내용은 로그인한 이름으로 변경 기록에 남고, 화면에 바로 반영됩니다.</li>
+    <li><b>지원 브라우저</b>: WebMCP는 아직 초안이라 Chrome의 실험 기능(미리보기·오리진 트라이얼)에서만 동작합니다. 지원하지 않는 브라우저에서는 아무 일도 일어나지 않습니다. 등록되면 그래프 페이지 오른쪽 패널 아래에 "WebMCP 도구 N개를 등록했습니다"라고 표시됩니다.</li>
+  </ul>
 
   <h2>이렇게 물어보세요</h2>
   <ul>
