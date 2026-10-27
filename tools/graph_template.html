@@ -336,6 +336,21 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => (t.hidden = true), isError ? 5000 : 2500);
   }
+  // Runs fn unless the same action is still in flight, so a double click creates one item.
+  const inFlight = new Set();
+  async function once(key, fn, button) {
+    if (inFlight.has(key)) return;
+    inFlight.add(key);
+    if (button) button.disabled = true;
+    try {
+      await fn();
+    } catch {
+      // mutate() has already shown the error.
+    } finally {
+      inFlight.delete(key);
+      if (button) button.disabled = false;
+    }
+  }
   async function mutate(method, path, body, okMessage) {
     try {
       const result = await request(method, path, body);
@@ -858,8 +873,12 @@
     const nameInput = h("input", { required: true, placeholder: "예: 라이너 브라운" });
     const enInput = h("input", { placeholder: "영어 이름 (선택)" });
     const descInput = h("textarea", {});
-    const submit = async (ev) => {
+    const submitButton = h("button", { className: "primary", type: "submit" }, "추가");
+    const submit = (ev) => {
       ev.preventDefault();
+      once("node", createNode, submitButton);
+    };
+    const createNode = async () => {
       const type = typeSelect.value;
       const g = groups.find((x) => x.types.includes(type));
       const name = nameInput.value.trim();
@@ -883,7 +902,7 @@
         h("label", {}, "영어 이름", enInput),
         h("label", {}, "설명", descInput),
         h("div", { className: "row" },
-          h("button", { className: "primary", type: "submit" }, "추가"),
+          submitButton,
           h("button", { type: "button", on: { click: () => { creating = false; renderPanel(); } } }, "취소"))
       ),
       h("p", { className: "hint" }, "추가한 뒤 노드를 골라 다른 노드와의 관계를 이어 주세요.")
@@ -1040,7 +1059,10 @@
     });
   }
 
-  async function addNoteAt(node) {
+  function addNoteAt(node) {
+    return once("note", () => createNoteAt(node), document.getElementById("addNote"));
+  }
+  async function createNoteAt(node) {
     let x, y;
     if (node) { x = node.x + 30; y = node.y - 90; }
     else { const c = toGraph(svg.getBoundingClientRect().left + W / 2, svg.getBoundingClientRect().top + H / 2); x = c.x - 85; y = c.y - 50; }
