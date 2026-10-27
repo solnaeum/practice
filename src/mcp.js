@@ -75,6 +75,11 @@ async function authorize(request, env) {
   return MCP_ACTOR;
 }
 
+/** Handles one JSON-RPC message in-process. The page's chatbot uses this as its MCP client. */
+export function mcpRequest(env, actor, message) {
+  return handleMessage(message, env, actor);
+}
+
 async function handleMessage(msg, env, actor) {
   if (!msg || msg.jsonrpc !== "2.0" || typeof msg.method !== "string") {
     return msg && "id" in msg ? rpcError(msg.id ?? null, -32600, "잘못된 JSON-RPC 요청입니다.") : null;

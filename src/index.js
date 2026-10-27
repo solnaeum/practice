@@ -1,8 +1,10 @@
-// titan-graph Worker: 그래프 데이터(D1)를 읽고 고치는 /api/*, AI 도구용 MCP 서버 /mcp, 정적 페이지를 함께 서비스한다.
-// 읽기는 누구나, 쓰기는 편집 비밀번호로 로그인한 사용자(웹)나 MCP 토큰을 가진 클라이언트만 할 수 있다.
+// titan-graph Worker: 그래프 데이터(D1)를 읽고 고치는 /api/*, 챗봇 /api/chat, AI 도구용 MCP 서버 /mcp,
+// 그리고 최신 그래프를 넣어 그려 보내는 첫 페이지(/)와 정적 파일을 함께 서비스한다.
+// 읽기는 누구나, 쓰기는 편집 비밀번호로 로그인한 사용자(웹·챗봇)나 MCP 토큰을 가진 클라이언트만 할 수 있다.
 
 import { SESSION_SECONDS, createSession, passwordMatches, readSession, sessionCookie } from "./auth.js";
 import { handleMcp } from "./mcp.js";
+import { handleChat } from "./chat.js";
 import {
   HttpError, assertNotLockedOut, recordLoginFailure, ensureSeeded,
   loadGraph, listNotes, listTrash, listHistory, revertHistory,
@@ -19,14 +21,15 @@ function json(body, status = 200, extra = {}) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const isMcp = url.pathname === "/mcp" || url.pathname === "/mcp/";
+    if (url.pathname === "/" && request.method === "GET") return renderHome(request, env);
     if (!url.pathname.startsWith("/api/") && !isMcp) return env.ASSETS.fetch(request);
     try {
       await ensureSeeded(env, request);
       if (isMcp) return await handleMcp(request, env);
-      return await route(request, env, url);
+      return await route(request, env, url, ctx);
     } catch (err) {
       if (err instanceof HttpError) return json({ error: err.message }, err.status);
       console.error(err);
@@ -35,9 +38,34 @@ export default {
   },
 };
 
+// ---------- Home page ----------
+
+// The page ships with a snapshot of titan.jsonld; replace it with the live graph, relations and notes
+// so the first paint already shows the current data. Falls back to the static page on any error.
+async function renderHome(request, env) {
+  const page = await env.ASSETS.fetch(request);
+  if (!page.ok || !(page.headers.get("content-type") || "").includes("text/html")) return page;
+  try {
+    await ensureSeeded(env, request);
+    const [{ doc, edges }, notes] = await Promise.all([loadGraph(env), listNotes(env)]);
+    const safe = (value) => JSON.stringify(value).replace(/</g, "\\u003c");
+    const html = new HTMLRewriter()
+      .on("script#titan-data", { element(el) { el.setInnerContent(safe(doc), { html: true }); } })
+      .on("script#live-data", { element(el) { el.setInnerContent(safe({ edges, notes, renderedAt: new Date().toISOString() }), { html: true }); } })
+      .transform(page);
+    const headers = new Headers(html.headers);
+    headers.set("cache-control", "no-store");
+    headers.delete("etag");
+    return new Response(html.body, { status: 200, headers });
+  } catch (err) {
+    console.error(err);
+    return page;
+  }
+}
+
 // ---------- Routing ----------
 
-async function route(request, env, url) {
+async function route(request, env, url, ctx) {
   const path = url.pathname.replace(/\/+$/, "");
   const method = request.method;
   const id = url.searchParams.get("id");
@@ -62,6 +90,7 @@ async function route(request, env, url) {
   }
 
   if (method === "POST" && path === "/api/login") return login(request, env);
+  if (method === "POST" && path === "/api/chat") return handleChat(request, env, ctx, await currentUser(request, env), await readJson(request));
   if (method === "POST" && path === "/api/logout") return json({ ok: true }, 200, { "set-cookie": sessionCookie("", 0) });
 
   const actor = await requireEditor(request, env);

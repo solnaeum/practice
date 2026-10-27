@@ -239,6 +239,63 @@
     box-shadow: 0 4px 14px rgba(0,0,0,.25); max-width: calc(100vw - 32px); z-index: 10;
   }
   #toast.error { background: var(--danger); color: #fff; }
+  .node.found circle { stroke: var(--accent); stroke-width: 4; }
+  .node.found text { font-weight: 700; }
+  #foundBar {
+    position: absolute; top: 10px; left: 10px; z-index: 5; max-width: calc(100% - 20px);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 5px 8px 5px 12px;
+    font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  #foundBar b { color: var(--accent); }
+  #foundBar button { padding: 2px 8px; font-size: 12px; }
+  .nodeRef {
+    background: color-mix(in srgb, var(--accent) 14%, transparent); border: none; border-radius: 3px;
+    padding: 0 2px; color: inherit; font: inherit; cursor: pointer; border-bottom: 1px solid var(--accent);
+  }
+  .nodeRef:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+  .node.flash circle { stroke: var(--accent); stroke-width: 5; animation: flash 0.9s ease-in-out 4; }
+  @keyframes flash { 50% { stroke-width: 12; stroke-opacity: .35; } }
+
+  /* Chatbot */
+  #chatToggle {
+    position: fixed; right: 20px; bottom: 20px; z-index: 20;
+    padding: 10px 16px; border-radius: 22px; font-size: 14px; font-weight: 600;
+    background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(0,0,0,.25);
+  }
+  #chat {
+    position: fixed; right: 20px; bottom: 20px; z-index: 21;
+    width: 380px; max-width: calc(100vw - 32px); height: min(600px, calc(100vh - 40px));
+    display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+  }
+  #chat header { padding: 10px 12px; gap: 6px; border-radius: 12px 12px 0 0; flex-wrap: nowrap; }
+  #chat header > div { min-width: 0; }
+  #chat header button { flex: none; }
+  #chat header h2 { font-size: 15px; margin: 0; }
+  #chat header .sub { color: var(--muted); font-size: 12px; }
+  #chat header .spacer { flex: 1; }
+  #chatLog { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { max-width: 88%; padding: 8px 11px; border-radius: 10px; font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+  .msg.user { align-self: flex-end; background: var(--accent); color: #fff; border-bottom-right-radius: 3px; white-space: pre-wrap; }
+  .msg.assistant { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); border-bottom-left-radius: 3px; }
+  .msg.assistant.error { border-color: var(--danger); color: var(--danger); }
+  .msg ul { margin: 4px 0; padding-left: 18px; }
+  .msg code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background: var(--panel); padding: 0 4px; border-radius: 3px; }
+  .steps { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
+  .steps:empty { display: none; }
+  .step { font-size: 12px; color: var(--muted); }
+  .step.fail { color: var(--danger); }
+  .thinking { font-size: 13px; color: var(--muted); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { font-size: 12px; border-radius: 14px; }
+  #chatForm { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  #chatInput { flex: 1; min-width: 0; resize: none; height: 40px; max-height: 120px; }
+  #chat .notice { font-size: 12px; color: var(--muted); padding: 0 12px 8px; }
+  @media (max-width: 760px) {
+    #chat { right: 8px; left: 8px; bottom: 8px; width: auto; max-width: none; height: min(78vh, 640px); }
+    #chatToggle { right: 12px; bottom: 12px; }
+  }
   @media (max-width: 760px) {
     body { grid-template-columns: 1fr; grid-template-rows: auto 60vh auto; height: auto; }
     aside { border-left: none; border-top: 1px solid var(--line); }
@@ -285,6 +342,7 @@
     </g>
   </svg>
   <div id="noteLayer"></div>
+  <div id="foundBar" role="status" hidden><span id="foundText"></span><button id="foundZoom" type="button">이 노드들로 이동</button><button id="foundClear" type="button">지우기</button></div>
 </div>
 <aside>
   <div class="tabs" id="tabs">
@@ -302,10 +360,26 @@
   </div>
 </aside>
 <div id="toast" role="status" hidden></div>
+<button id="chatToggle" type="button" hidden>그래프 챗봇</button>
+<section id="chat" aria-label="그래프 챗봇" hidden>
+  <header>
+    <div><h2>그래프 챗봇</h2><div class="sub">Workers AI · GLM-4.7-Flash · MCP 도구 사용</div></div>
+    <span class="spacer"></span>
+    <button id="chatReset" type="button" title="새 대화">새 대화</button>
+    <button id="chatClose" type="button" aria-label="닫기">닫기</button>
+  </header>
+  <div id="chatLog" aria-live="polite"></div>
+  <p class="notice" id="chatNotice"></p>
+  <form id="chatForm">
+    <textarea id="chatInput" rows="1" maxlength="1000" placeholder="그래프에 대해 물어보세요" aria-label="질문"></textarea>
+    <button class="primary" id="chatSend" type="submit">보내기</button>
+  </form>
+</section>
 
 <script type="application/ld+json" id="titan-data">
 /*__TITAN_JSONLD__*/
 </script>
+<script type="application/json" id="live-data">null</script>
 <script>
 (async function () {
   "use strict";
@@ -617,9 +691,17 @@
     renderNotes();
   }
 
-  function applyHighlight() {
+  // Nodes marked as found: by the search box, or by the chatbot's searches (foundIris).
+  let foundIris = null;
+  let foundLabel = "";
+  function searchMatches() {
     const term = searchTerm.trim().toLowerCase();
-    const matches = term ? new Set(nodes.filter((n) => visible(n) && (n.label.toLowerCase().includes(term) || n.iri.toLowerCase().includes(term))).map((n) => n.iri)) : null;
+    if (!term) return null;
+    return new Set(nodes.filter((n) => visible(n) && (n.label.toLowerCase().includes(term) || n.iri.toLowerCase().includes(term))).map((n) => n.iri));
+  }
+  function applyHighlight() {
+    const matches = searchMatches();
+    const found = matches || foundIris;
     let focus = null;
     if (selected) {
       focus = new Set([selected.iri]);
@@ -629,14 +711,17 @@
         if (e.target === selected.iri) focus.add(e.source);
       });
     }
+    // With a selection and found nodes at once, both stay bright.
     nodes.forEach((n) => {
-      const dim = (focus && !focus.has(n.iri)) || (matches && !matches.has(n.iri));
-      n.el.classList.toggle("dim", !!dim);
+      const bright = (focus && focus.has(n.iri)) || (found && found.has(n.iri));
+      n.el.classList.toggle("dim", !!(focus || found) && !bright);
       n.el.classList.toggle("selected", selected === n);
+      n.el.classList.toggle("found", !!found && found.has(n.iri));
     });
     allEdges.forEach((e) => {
       const hi = !!selected && (e.source === selected.iri || e.target === selected.iri);
-      const dim = (selected && !hi) || (matches && !(matches.has(e.source) && matches.has(e.target)));
+      const between = !!found && found.has(e.source) && found.has(e.target);
+      const dim = !!(focus || found) && !hi && !between;
       e.el.classList.toggle("hi", hi);
       e.el.classList.toggle("dim", !!dim);
       if (!e.symmetric) e.el.setAttribute("marker-end", hi ? "url(#arrow-hi)" : "url(#arrow)");
@@ -644,6 +729,69 @@
       e.lel.classList.toggle("dim", !!dim);
       e.lel.style.visibility = showLabels || hi ? "visible" : "hidden";
     });
+    updateFoundBar(matches, found);
+  }
+
+  function updateFoundBar(matches, found) {
+    const bar = document.getElementById("foundBar");
+    if (!found) { bar.hidden = true; return; }
+    const text = document.getElementById("foundText");
+    const label = matches ? `검색 '${searchTerm.trim()}'` : foundLabel;
+    text.replaceChildren(label + " · ", h("b", {}, `${found.size}개`), found.size ? "" : " (찾은 노드 없음)");
+    document.getElementById("foundZoom").hidden = !found.size;
+    bar.hidden = false;
+  }
+
+  /** Marks nodes as found (e.g. the chatbot's search hits) and optionally moves the view to them. */
+  function showFound(ids, label, zoom) {
+    const found = ids.map((id) => nodeByIri.get(expand(String(id)))).filter((n) => n && !n.isClass);
+    found.forEach((n) => { if (!visible(n)) setGroupVisible(n.group, true); });
+    searchTerm = "";
+    document.getElementById("search").value = "";
+    foundIris = new Set(found.map((n) => n.iri));
+    foundLabel = label;
+    applyHighlight();
+    if (zoom && found.length) zoomToNodes(found);
+    return found.length;
+  }
+  function clearFound() {
+    foundIris = null;
+    searchTerm = "";
+    document.getElementById("search").value = "";
+    applyHighlight();
+  }
+
+  // Animate the view so the given nodes fill the stage (at most 1.6x zoom).
+  let zoomAnim = 0;
+  function zoomToNodes(list) {
+    if (!list.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    list.forEach((n) => {
+      x0 = Math.min(x0, n.x - 20); y0 = Math.min(y0, n.y - 20);
+      x1 = Math.max(x1, n.x + 20 + n.label.length * 11); y1 = Math.max(y1, n.y + 20);
+    });
+    // Fit into the part of the stage the open chat panel does not cover.
+    let width = W;
+    const chatEl = document.getElementById("chat");
+    if (!chatEl.hidden && window.innerWidth > 760) {
+      const left = chatEl.getBoundingClientRect().left - svg.getBoundingClientRect().left;
+      if (left > 200 && left < W) width = left;
+    }
+    const pad = 60;
+    const s = Math.max(0.3, Math.min(1.6, (width - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0)));
+    const target = { s, x: width / 2 - ((x0 + x1) / 2) * s, y: H / 2 - ((y0 + y1) / 2) * s };
+    const from = { ...view };
+    const start = performance.now();
+    const id = ++zoomAnim;
+    const stepView = (t) => {
+      if (id !== zoomAnim) return;
+      const k = Math.min(1, (t - start) / 450);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      view = { s: from.s + (target.s - from.s) * e, x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e };
+      applyView();
+      if (k < 1) requestAnimationFrame(stepView);
+    };
+    requestAnimationFrame(stepView);
   }
 
   // ---------- Legend ----------
@@ -870,6 +1018,7 @@
     renderNotes();
     renderPanel();
     registerWebMcpTools();
+    updateChatNotice();
   }
 
   // Ids of nodes in the trash are not on the page, so a taken id (409) is retried with the next suffix.
@@ -1340,7 +1489,20 @@
   svg.addEventListener("pointercancel", endPointer);
 
   // ---------- Controls ----------
-  document.getElementById("search").addEventListener("input", (ev) => { searchTerm = ev.target.value; applyHighlight(); });
+  document.getElementById("search").addEventListener("input", (ev) => { searchTerm = ev.target.value; foundIris = null; applyHighlight(); });
+  document.getElementById("search").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    const matches = searchMatches();
+    if (!matches || !matches.size) return;
+    const list = [...matches].map((iri) => nodeByIri.get(iri));
+    if (list.length === 1) select(list[0]);
+    zoomToNodes(list);
+  });
+  document.getElementById("foundZoom").addEventListener("click", () => {
+    const set = searchMatches() || foundIris;
+    if (set) zoomToNodes([...set].map((iri) => nodeByIri.get(iri)).filter(Boolean));
+  });
+  document.getElementById("foundClear").addEventListener("click", clearFound);
   document.getElementById("showLabels").addEventListener("change", (ev) => { showLabels = ev.target.checked; applyHighlight(); });
   document.getElementById("showOntology").addEventListener("change", (ev) => setGroupVisible("class", ev.target.checked));
   document.getElementById("showNotes").addEventListener("change", (ev) => { showNotes = ev.target.checked; renderNotes(); });
@@ -1586,6 +1748,201 @@
     hint.textContent = `이 브라우저의 AI 에이전트에게 WebMCP 도구 ${webMcpCount}개를 등록했습니다` + (api.canEdit ? " (쓰기 포함)." : " (읽기 전용 — 편집 로그인하면 쓰기 도구도 등록됩니다).");
   }
 
+  // ---------- Chatbot ----------
+  // Talks to /api/chat, which runs Workers AI with this site's MCP tools and streams its steps back.
+  const TOOL_LABELS = {
+    graph_overview: "그래프 개요 보기", search_nodes: "노드 검색", get_node: "노드 자세히 보기", list_notes: "메모 목록 보기",
+    list_trash: "휴지통 보기", list_history: "변경 기록 보기", create_node: "노드 추가", update_node: "노드 수정",
+    delete_node: "노드 삭제", restore_node: "노드 복원", add_relation: "관계 추가", delete_relation: "관계 삭제",
+    restore_relation: "관계 복원", add_note: "메모 붙이기", update_note: "메모 수정", delete_note: "메모 삭제",
+    restore_note: "메모 복원", revert_change: "수정 되돌리기", highlight_nodes: "화면에 표시",
+  };
+  const CHAT_EXAMPLES = ["진격의 거인과 걸리버 여행기의 공통 주제는?", "브롭딩낵 사람은 얼마나 커?", "엘런 예거와 아는 사이인 인물은?"];
+  const chatHistory = [];
+  const lastToolArgs = {};
+  let chatBusy = false;
+  const chatLog = document.getElementById("chatLog");
+
+  function escapeHtml(text) {
+    return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+  // A small, safe subset of Markdown: **bold**, `code`, "- " bullet lists and line breaks.
+  function renderMarkdown(text) {
+    const lines = escapeHtml(text).split("\n");
+    let html = "", inList = false;
+    for (const line of lines) {
+      const inline = line.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+      const bullet = inline.match(/^\s*[-*•]\s+(.*)$/);
+      if (bullet) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${bullet[1]}</li>`; continue; }
+      if (inList) { html += "</ul>"; inList = false; }
+      html += inline + "<br>";
+    }
+    if (inList) html += "</ul>";
+    return html.replace(/(<br>)+$/, "");
+  }
+
+  // Wraps node names in an answer as buttons that show the node on the graph.
+  function linkNodeNames(container) {
+    const named = [...byIri.values()].filter((n) => n.label && n.label.length >= 2).sort((a, b) => b.label.length - a.label.length);
+    if (!named.length) return;
+    const byLabel = new Map(named.map((n) => [n.label, n]));
+    const pattern = new RegExp(named.map((n) => n.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const texts = [];
+    while (walker.nextNode()) texts.push(walker.currentNode);
+    texts.forEach((textNode) => {
+      const value = textNode.nodeValue;
+      pattern.lastIndex = 0;
+      if (!pattern.test(value)) return;
+      pattern.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0, m;
+      while ((m = pattern.exec(value))) {
+        frag.append(value.slice(last, m.index));
+        const node = byLabel.get(m[0]);
+        frag.append(h("button", { className: "nodeRef", type: "button", title: "그래프에서 보기", on: { click: () => { showFound([node.id], `'${node.label}'`, true); flashNodes([node.id]); } } }, m[0]));
+        last = m.index + m[0].length;
+      }
+      frag.append(value.slice(last));
+      textNode.replaceWith(frag);
+    });
+  }
+
+  function addBubble(role, text) {
+    const bubble = h("div", { className: "msg " + role });
+    if (role === "user") bubble.textContent = text;
+    chatLog.append(bubble);
+    chatLog.scrollTop = chatLog.scrollHeight;
+    return bubble;
+  }
+
+  function flashNodes(ids) {
+    const found = ids.map((id) => nodeByIri.get(expand(String(id)))).filter((n) => n && !n.isClass);
+    // Only the nodes pointed at now should flash.
+    nodes.forEach((n) => { if (!found.includes(n)) n.el.classList.remove("flash"); });
+    found.forEach((n) => {
+      if (!visible(n)) setGroupVisible(n.group, true);
+      n.el.classList.remove("flash");
+      void n.el.getBBox();
+      n.el.classList.add("flash");
+      setTimeout(() => n.el.classList.remove("flash"), 4000);
+    });
+    if (found.length === 1 && tab === "detail" && !loggingIn && !creating) select(found[0]);
+    return found.length;
+  }
+
+  function chatIntro() {
+    chatLog.replaceChildren();
+    const intro = addBubble("assistant");
+    intro.innerHTML = renderMarkdown("안녕하세요! 이 그래프의 작품, 인물, 거인 종족, 주제에 대해 물어보세요. 제가 MCP 도구로 그래프를 찾아보고, 이야기하는 노드를 화면에 표시해 드릴게요.");
+    intro.append(h("div", { className: "chips", style: "margin-top:8px" }, CHAT_EXAMPLES.map((q) => h("button", { type: "button", on: { click: () => sendChat(q) } }, q))));
+  }
+
+  function updateChatNotice() {
+    document.getElementById("chatNotice").textContent = api.canEdit
+      ? `편집 모드: 챗봇이 요청에 따라 노드·관계·메모를 고칠 수 있고, 기록에는 '${api.name} (챗봇)'으로 남습니다.`
+      : "읽기 전용입니다. 편집 로그인하면 챗봇에게 메모 붙이기나 노드 수정도 부탁할 수 있습니다.";
+  }
+
+  async function sendChat(text) {
+    text = String(text || "").trim();
+    if (!text || chatBusy) return;
+    chatBusy = true;
+    const input = document.getElementById("chatInput");
+    const sendButton = document.getElementById("chatSend");
+    sendButton.disabled = true;
+    input.value = "";
+    chatHistory.push({ role: "user", content: text });
+    addBubble("user", text);
+    const bubble = addBubble("assistant");
+    const steps = h("div", { className: "steps" });
+    const body = h("div", { className: "thinking" }, "생각하는 중…");
+    bubble.append(steps, body);
+    let answered = false;
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messages: chatHistory }),
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `챗봇 요청이 실패했습니다 (${res.status})`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        let cut;
+        while ((cut = buffer.indexOf("\n\n")) >= 0) {
+          const chunk = buffer.slice(0, cut);
+          buffer = buffer.slice(cut + 2);
+          const line = chunk.split("\n").find((l) => l.startsWith("data: "));
+          if (!line) continue;
+          let ev;
+          try { ev = JSON.parse(line.slice(6)); } catch { continue; }
+          if (ev.type === "tool") {
+            lastToolArgs[ev.name] = ev.args || {};
+            steps.append(h("div", { className: "step" }, "도구: " + (TOOL_LABELS[ev.name] || ev.name) + (ev.args && (ev.args.query || ev.args.id) ? ` (${ev.args.query || ev.args.id})` : "")));
+          } else if (ev.type === "tool_result" && !ev.ok) {
+            steps.lastChild && steps.lastChild.classList.add("fail");
+          } else if (ev.type === "tool_result" && ev.ids && ev.ids.length && (ev.name === "search_nodes" || ev.name === "get_node")) {
+            const args = lastToolArgs[ev.name] || {};
+            const label = ev.name === "search_nodes" ? `챗봇 검색 '${args.query || ""}'` : `챗봇이 살펴본 노드와 이웃`;
+            showFound(ev.ids, label, true);
+          } else if (ev.type === "highlight") {
+            if ((ev.ids || []).length) showFound(ev.ids, "챗봇이 가리킨 노드", true);
+            flashNodes(ev.ids || []);
+          } else if (ev.type === "answer") {
+            answered = true;
+            body.className = "";
+            body.innerHTML = renderMarkdown(ev.text);
+            linkNodeNames(body);
+            chatHistory.push({ role: "assistant", content: ev.text });
+          } else if (ev.type === "error") {
+            answered = true;
+            bubble.classList.add("error");
+            body.className = "";
+            body.textContent = ev.message;
+          } else if (ev.type === "done") {
+            if (ev.changed) { await reload(); toast("챗봇이 그래프를 바꿨습니다."); }
+            if (ev.highlight && ev.highlight.length) flashNodes(ev.highlight);
+          }
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }
+      }
+      if (!answered) throw new Error("챗봇 응답이 중간에 끊겼습니다.");
+    } catch (err) {
+      bubble.classList.add("error");
+      body.className = "";
+      body.textContent = err.message;
+      if (!answered) chatHistory.pop();
+    } finally {
+      chatBusy = false;
+      sendButton.disabled = false;
+      input.focus();
+    }
+  }
+
+  function setupChat() {
+    const toggle = document.getElementById("chatToggle");
+    const panelEl = document.getElementById("chat");
+    toggle.hidden = !api.online;
+    if (!api.online) return;
+    chatIntro();
+    updateChatNotice();
+    toggle.addEventListener("click", () => { panelEl.hidden = false; toggle.hidden = true; updateChatNotice(); document.getElementById("chatInput").focus(); });
+    document.getElementById("chatClose").addEventListener("click", () => { panelEl.hidden = true; toggle.hidden = false; });
+    document.getElementById("chatReset").addEventListener("click", () => { if (chatBusy) return; chatHistory.length = 0; chatIntro(); clearFound(); });
+    document.getElementById("chatForm").addEventListener("submit", (ev) => { ev.preventDefault(); sendChat(document.getElementById("chatInput").value); });
+    document.getElementById("chatInput").addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); sendChat(ev.target.value); }
+    });
+  }
+
   // ---------- Load ----------
   async function reload() {
     const [graph, noteRes] = await Promise.all([request("GET", "/api/graph"), request("GET", "/api/notes")]);
@@ -1609,21 +1966,31 @@
       : "데이터: 페이지에 들어 있는 titan.jsonld 사본입니다. 서버에 연결되지 않아 편집할 수 없습니다.";
   }
 
+  // The Worker renders "/" with the live graph, relations and notes already in the page (live-data);
+  // the static copy (titan_graph.html) has none and only the embedded snapshot.
+  let live = null;
+  try { live = JSON.parse(document.getElementById("live-data").textContent || "null"); } catch {}
   try {
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000));
     const meInfo = await Promise.race([request("GET", "/api/me"), timeout]);
     Object.assign(api, meInfo, { online: true });
-    await reload();
+    if (live) {
+      notes = live.notes;
+      rebuild(embeddedDoc, live.edges);
+    } else {
+      await reload();
+    }
   } catch {
     api.online = false;
     api.canEdit = false;
-    notes = [];
-    rebuild(embeddedDoc, []);
+    notes = live ? live.notes : [];
+    rebuild(embeddedDoc, live ? live.edges : []);
   }
   setMode();
   renderPanel();
   renderNotes();
   registerWebMcpTools();
+  setupChat();
 })();
 </script>
 </body>
