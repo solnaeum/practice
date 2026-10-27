@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "titan-graph": {
+      "type": "http",
+      "url": "https://titan-graph.robocast.workers.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer ${TITAN_GRAPH_MCP_TOKEN:-}"
+      }
+    }
+  }
+}

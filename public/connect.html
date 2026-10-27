@@ -148,6 +148,7 @@
     <p>터미널에서 한 줄로 추가합니다.</p>
     <div class="codebox"><pre id="cc">claude mcp add --transport http titan-graph {URL} --header "Authorization: Bearer &lt;MCP_TOKEN&gt;"</pre><button type="button" data-copy="cc">복사</button></div>
     <p>추가한 뒤 Claude Code 안에서 <code>/mcp</code>를 입력하면 연결 상태와 도구 목록을 볼 수 있습니다.</p>
+    <p>저장소(<a href="https://github.com/solnaeum/practice" target="_blank" rel="noopener">solnaeum/practice</a>)를 Claude Code로 열면 루트의 <code>.mcp.json</code> 덕분에 이 명령 없이도 titan-graph가 자동으로 등록됩니다. 처음 열 때 사용 여부를 묻습니다. 쓰기까지 하려면 환경 변수 <code>TITAN_GRAPH_MCP_TOKEN</code>에 토큰을 넣고, 없으면 읽기 전용으로 연결됩니다.</p>
   </section>
 
   <section class="tabpanel" data-panel="claude-app" hidden>
