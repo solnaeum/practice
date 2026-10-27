@@ -88,11 +88,26 @@ export function parseModelOutput(out) {
   return { text, toolCalls };
 }
 
+// Node ids a tool result talks about, so the page can mark them (search hits, a node and its neighbours).
+export function idsInResult(name, text) {
+  if (name === "graph_overview" || name === "export_jsonld") return [];
+  let data;
+  try { data = JSON.parse(text); } catch { return []; }
+  const ids = [];
+  const add = (v) => { if (typeof v === "string" && v.includes("/") && !/^https?:/.test(v) && !ids.includes(v)) ids.push(v); };
+  if (Array.isArray(data.results)) data.results.forEach((r) => add(r.id));
+  add(data.id);
+  (data.outgoing || []).forEach((e) => add(e.target));
+  (data.incoming || []).forEach((e) => add(e.source));
+  if (data.note) add(data.note.node_id);
+  return ids.slice(0, 30);
+}
+
 // ---------- Handler ----------
 
 /**
  * user is the logged-in editor name or null. Returns an SSE response; events are JSON objects:
- * {type:"tool", name, args} · {type:"tool_result", name, ok, text} · {type:"highlight", ids}
+ * {type:"tool", name, args} · {type:"tool_result", name, ok, text, ids} · {type:"highlight", ids}
  * {type:"answer", text} · {type:"error", message} · {type:"done", changed, highlight}
  */
 export async function handleChat(request, env, ctx, user, body) {
@@ -167,7 +182,7 @@ export async function runConversation(env, actor, history, send) {
         if (ok && writeTools.has(call.name)) changed = true;
         for (const key of ["id", "source", "target", "node_id"]) if (ok && typeof call.args[key] === "string" && call.args[key].includes("/")) highlight.add(call.args[key]);
       }
-      await send({ type: "tool_result", name: call.name, ok, text: resultText.slice(0, 300) });
+      await send({ type: "tool_result", name: call.name, ok, text: resultText.slice(0, 300), ids: ok ? idsInResult(call.name, resultText) : [] });
       messages.push({ role: "tool", tool_call_id: call.id, name: call.name, content: resultText });
     }
   }

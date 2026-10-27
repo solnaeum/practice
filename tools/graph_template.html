@@ -239,6 +239,21 @@
     box-shadow: 0 4px 14px rgba(0,0,0,.25); max-width: calc(100vw - 32px); z-index: 10;
   }
   #toast.error { background: var(--danger); color: #fff; }
+  .node.found circle { stroke: var(--accent); stroke-width: 4; }
+  .node.found text { font-weight: 700; }
+  #foundBar {
+    position: absolute; top: 10px; left: 10px; z-index: 5; max-width: calc(100% - 20px);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 5px 8px 5px 12px;
+    font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.12);
+  }
+  #foundBar b { color: var(--accent); }
+  #foundBar button { padding: 2px 8px; font-size: 12px; }
+  .nodeRef {
+    background: color-mix(in srgb, var(--accent) 14%, transparent); border: none; border-radius: 3px;
+    padding: 0 2px; color: inherit; font: inherit; cursor: pointer; border-bottom: 1px solid var(--accent);
+  }
+  .nodeRef:hover { background: color-mix(in srgb, var(--accent) 28%, transparent); }
   .node.flash circle { stroke: var(--accent); stroke-width: 5; animation: flash 0.9s ease-in-out 4; }
   @keyframes flash { 50% { stroke-width: 12; stroke-opacity: .35; } }
 
@@ -327,6 +342,7 @@
     </g>
   </svg>
   <div id="noteLayer"></div>
+  <div id="foundBar" role="status" hidden><span id="foundText"></span><button id="foundZoom" type="button">이 노드들로 이동</button><button id="foundClear" type="button">지우기</button></div>
 </div>
 <aside>
   <div class="tabs" id="tabs">
@@ -675,9 +691,17 @@
     renderNotes();
   }
 
-  function applyHighlight() {
+  // Nodes marked as found: by the search box, or by the chatbot's searches (foundIris).
+  let foundIris = null;
+  let foundLabel = "";
+  function searchMatches() {
     const term = searchTerm.trim().toLowerCase();
-    const matches = term ? new Set(nodes.filter((n) => visible(n) && (n.label.toLowerCase().includes(term) || n.iri.toLowerCase().includes(term))).map((n) => n.iri)) : null;
+    if (!term) return null;
+    return new Set(nodes.filter((n) => visible(n) && (n.label.toLowerCase().includes(term) || n.iri.toLowerCase().includes(term))).map((n) => n.iri));
+  }
+  function applyHighlight() {
+    const matches = searchMatches();
+    const found = matches || foundIris;
     let focus = null;
     if (selected) {
       focus = new Set([selected.iri]);
@@ -687,14 +711,17 @@
         if (e.target === selected.iri) focus.add(e.source);
       });
     }
+    // With a selection and found nodes at once, both stay bright.
     nodes.forEach((n) => {
-      const dim = (focus && !focus.has(n.iri)) || (matches && !matches.has(n.iri));
-      n.el.classList.toggle("dim", !!dim);
+      const bright = (focus && focus.has(n.iri)) || (found && found.has(n.iri));
+      n.el.classList.toggle("dim", !!(focus || found) && !bright);
       n.el.classList.toggle("selected", selected === n);
+      n.el.classList.toggle("found", !!found && found.has(n.iri));
     });
     allEdges.forEach((e) => {
       const hi = !!selected && (e.source === selected.iri || e.target === selected.iri);
-      const dim = (selected && !hi) || (matches && !(matches.has(e.source) && matches.has(e.target)));
+      const between = !!found && found.has(e.source) && found.has(e.target);
+      const dim = !!(focus || found) && !hi && !between;
       e.el.classList.toggle("hi", hi);
       e.el.classList.toggle("dim", !!dim);
       if (!e.symmetric) e.el.setAttribute("marker-end", hi ? "url(#arrow-hi)" : "url(#arrow)");
@@ -702,6 +729,69 @@
       e.lel.classList.toggle("dim", !!dim);
       e.lel.style.visibility = showLabels || hi ? "visible" : "hidden";
     });
+    updateFoundBar(matches, found);
+  }
+
+  function updateFoundBar(matches, found) {
+    const bar = document.getElementById("foundBar");
+    if (!found) { bar.hidden = true; return; }
+    const text = document.getElementById("foundText");
+    const label = matches ? `검색 '${searchTerm.trim()}'` : foundLabel;
+    text.replaceChildren(label + " · ", h("b", {}, `${found.size}개`), found.size ? "" : " (찾은 노드 없음)");
+    document.getElementById("foundZoom").hidden = !found.size;
+    bar.hidden = false;
+  }
+
+  /** Marks nodes as found (e.g. the chatbot's search hits) and optionally moves the view to them. */
+  function showFound(ids, label, zoom) {
+    const found = ids.map((id) => nodeByIri.get(expand(String(id)))).filter((n) => n && !n.isClass);
+    found.forEach((n) => { if (!visible(n)) setGroupVisible(n.group, true); });
+    searchTerm = "";
+    document.getElementById("search").value = "";
+    foundIris = new Set(found.map((n) => n.iri));
+    foundLabel = label;
+    applyHighlight();
+    if (zoom && found.length) zoomToNodes(found);
+    return found.length;
+  }
+  function clearFound() {
+    foundIris = null;
+    searchTerm = "";
+    document.getElementById("search").value = "";
+    applyHighlight();
+  }
+
+  // Animate the view so the given nodes fill the stage (at most 1.6x zoom).
+  let zoomAnim = 0;
+  function zoomToNodes(list) {
+    if (!list.length) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    list.forEach((n) => {
+      x0 = Math.min(x0, n.x - 20); y0 = Math.min(y0, n.y - 20);
+      x1 = Math.max(x1, n.x + 20 + n.label.length * 11); y1 = Math.max(y1, n.y + 20);
+    });
+    // Fit into the part of the stage the open chat panel does not cover.
+    let width = W;
+    const chatEl = document.getElementById("chat");
+    if (!chatEl.hidden && window.innerWidth > 760) {
+      const left = chatEl.getBoundingClientRect().left - svg.getBoundingClientRect().left;
+      if (left > 200 && left < W) width = left;
+    }
+    const pad = 60;
+    const s = Math.max(0.3, Math.min(1.6, (width - pad * 2) / (x1 - x0), (H - pad * 2) / (y1 - y0)));
+    const target = { s, x: width / 2 - ((x0 + x1) / 2) * s, y: H / 2 - ((y0 + y1) / 2) * s };
+    const from = { ...view };
+    const start = performance.now();
+    const id = ++zoomAnim;
+    const stepView = (t) => {
+      if (id !== zoomAnim) return;
+      const k = Math.min(1, (t - start) / 450);
+      const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      view = { s: from.s + (target.s - from.s) * e, x: from.x + (target.x - from.x) * e, y: from.y + (target.y - from.y) * e };
+      applyView();
+      if (k < 1) requestAnimationFrame(stepView);
+    };
+    requestAnimationFrame(stepView);
   }
 
   // ---------- Legend ----------
@@ -1399,7 +1489,20 @@
   svg.addEventListener("pointercancel", endPointer);
 
   // ---------- Controls ----------
-  document.getElementById("search").addEventListener("input", (ev) => { searchTerm = ev.target.value; applyHighlight(); });
+  document.getElementById("search").addEventListener("input", (ev) => { searchTerm = ev.target.value; foundIris = null; applyHighlight(); });
+  document.getElementById("search").addEventListener("keydown", (ev) => {
+    if (ev.key !== "Enter") return;
+    const matches = searchMatches();
+    if (!matches || !matches.size) return;
+    const list = [...matches].map((iri) => nodeByIri.get(iri));
+    if (list.length === 1) select(list[0]);
+    zoomToNodes(list);
+  });
+  document.getElementById("foundZoom").addEventListener("click", () => {
+    const set = searchMatches() || foundIris;
+    if (set) zoomToNodes([...set].map((iri) => nodeByIri.get(iri)).filter(Boolean));
+  });
+  document.getElementById("foundClear").addEventListener("click", clearFound);
   document.getElementById("showLabels").addEventListener("change", (ev) => { showLabels = ev.target.checked; applyHighlight(); });
   document.getElementById("showOntology").addEventListener("change", (ev) => setGroupVisible("class", ev.target.checked));
   document.getElementById("showNotes").addEventListener("change", (ev) => { showNotes = ev.target.checked; renderNotes(); });
@@ -1656,6 +1759,7 @@
   };
   const CHAT_EXAMPLES = ["진격의 거인과 걸리버 여행기의 공통 주제는?", "브롭딩낵 사람은 얼마나 커?", "엘런 예거와 아는 사이인 인물은?"];
   const chatHistory = [];
+  const lastToolArgs = {};
   let chatBusy = false;
   const chatLog = document.getElementById("chatLog");
 
@@ -1677,6 +1781,33 @@
     return html.replace(/(<br>)+$/, "");
   }
 
+  // Wraps node names in an answer as buttons that show the node on the graph.
+  function linkNodeNames(container) {
+    const named = [...byIri.values()].filter((n) => n.label && n.label.length >= 2).sort((a, b) => b.label.length - a.label.length);
+    if (!named.length) return;
+    const byLabel = new Map(named.map((n) => [n.label, n]));
+    const pattern = new RegExp(named.map((n) => n.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "g");
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+    const texts = [];
+    while (walker.nextNode()) texts.push(walker.currentNode);
+    texts.forEach((textNode) => {
+      const value = textNode.nodeValue;
+      pattern.lastIndex = 0;
+      if (!pattern.test(value)) return;
+      pattern.lastIndex = 0;
+      const frag = document.createDocumentFragment();
+      let last = 0, m;
+      while ((m = pattern.exec(value))) {
+        frag.append(value.slice(last, m.index));
+        const node = byLabel.get(m[0]);
+        frag.append(h("button", { className: "nodeRef", type: "button", title: "그래프에서 보기", on: { click: () => { showFound([node.id], `'${node.label}'`, true); flashNodes([node.id]); } } }, m[0]));
+        last = m.index + m[0].length;
+      }
+      frag.append(value.slice(last));
+      textNode.replaceWith(frag);
+    });
+  }
+
   function addBubble(role, text) {
     const bubble = h("div", { className: "msg " + role });
     if (role === "user") bubble.textContent = text;
@@ -1687,6 +1818,8 @@
 
   function flashNodes(ids) {
     const found = ids.map((id) => nodeByIri.get(expand(String(id)))).filter((n) => n && !n.isClass);
+    // Only the nodes pointed at now should flash.
+    nodes.forEach((n) => { if (!found.includes(n)) n.el.classList.remove("flash"); });
     found.forEach((n) => {
       if (!visible(n)) setGroupVisible(n.group, true);
       n.el.classList.remove("flash");
@@ -1752,15 +1885,22 @@
           let ev;
           try { ev = JSON.parse(line.slice(6)); } catch { continue; }
           if (ev.type === "tool") {
+            lastToolArgs[ev.name] = ev.args || {};
             steps.append(h("div", { className: "step" }, "도구: " + (TOOL_LABELS[ev.name] || ev.name) + (ev.args && (ev.args.query || ev.args.id) ? ` (${ev.args.query || ev.args.id})` : "")));
           } else if (ev.type === "tool_result" && !ev.ok) {
             steps.lastChild && steps.lastChild.classList.add("fail");
+          } else if (ev.type === "tool_result" && ev.ids && ev.ids.length && (ev.name === "search_nodes" || ev.name === "get_node")) {
+            const args = lastToolArgs[ev.name] || {};
+            const label = ev.name === "search_nodes" ? `챗봇 검색 '${args.query || ""}'` : `챗봇이 살펴본 노드와 이웃`;
+            showFound(ev.ids, label, true);
           } else if (ev.type === "highlight") {
+            if ((ev.ids || []).length) showFound(ev.ids, "챗봇이 가리킨 노드", true);
             flashNodes(ev.ids || []);
           } else if (ev.type === "answer") {
             answered = true;
             body.className = "";
             body.innerHTML = renderMarkdown(ev.text);
+            linkNodeNames(body);
             chatHistory.push({ role: "assistant", content: ev.text });
           } else if (ev.type === "error") {
             answered = true;
@@ -1796,7 +1936,7 @@
     updateChatNotice();
     toggle.addEventListener("click", () => { panelEl.hidden = false; toggle.hidden = true; updateChatNotice(); document.getElementById("chatInput").focus(); });
     document.getElementById("chatClose").addEventListener("click", () => { panelEl.hidden = true; toggle.hidden = false; });
-    document.getElementById("chatReset").addEventListener("click", () => { if (chatBusy) return; chatHistory.length = 0; chatIntro(); });
+    document.getElementById("chatReset").addEventListener("click", () => { if (chatBusy) return; chatHistory.length = 0; chatIntro(); clearFound(); });
     document.getElementById("chatForm").addEventListener("submit", (ev) => { ev.preventDefault(); sendChat(document.getElementById("chatInput").value); });
     document.getElementById("chatInput").addEventListener("keydown", (ev) => {
       if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); sendChat(ev.target.value); }
